@@ -85,15 +85,15 @@ const CheckCollision = (entities, { dispatch }) => {
 };
 
 // Renderers
-const Player = ({ body }) => {
+const Player = (props) => {
   return (
     <View
       style={{
         position: 'absolute',
-        left: body.x,
-        top: body.y,
-        width: body.width,
-        height: body.height,
+        left: props.x,
+        top: props.y,
+        width: props.width,
+        height: props.height,
         backgroundColor: '#00ff00',
         borderWidth: 2,
         borderColor: '#00aa00',
@@ -102,15 +102,15 @@ const Player = ({ body }) => {
   );
 };
 
-const Obstacle = ({ body }) => {
+const Obstacle = (props) => {
   return (
     <View
       style={{
         position: 'absolute',
-        left: body.x,
-        top: body.y,
-        width: body.width,
-        height: body.height,
+        left: props.x,
+        top: props.y,
+        width: props.width,
+        height: props.height,
         backgroundColor: '#ff0044',
         borderWidth: 2,
         borderColor: '#cc0033',
