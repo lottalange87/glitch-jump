@@ -29,11 +29,11 @@ export const GAME = {
   MAX_SPAWN_MS: 2200,
   OBSTACLE_WIDTH: 28,
   MIN_OBSTACLE_HEIGHT: 40,
-  MAX_OBSTACLE_HEIGHT: 120,
+  MAX_OBSTACLE_HEIGHT: 180, // Increased from 120 for taller obstacles
   GAP_MIN: 140,
   
   // Power-ups
-  STAR_POINTS: 5,
+  STAR_POINTS: 10,
   SHIELD_DURATION: 3000, // ms
   SLOWMO_DURATION: 2500, // ms
   SLOWMO_FACTOR: 0.5, // 50% speed

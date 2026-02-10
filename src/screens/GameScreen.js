@@ -285,7 +285,20 @@ const StarRenderer = (props) => {
       width: size * scale,
       height: size * scale,
       transform: [{ scale }],
+      alignItems: 'center',
     }}>
+      {/* +10 Label above */}
+      <Text style={{
+        position: 'absolute',
+        top: -16,
+        color: GAME.COLORS.STAR,
+        fontSize: 12,
+        fontWeight: 'bold',
+        fontFamily: 'monospace',
+        textShadowColor: GAME.COLORS.STAR,
+        textShadowOffset: { width: 0, height: 0 },
+        textShadowRadius: 4,
+      }}>+10</Text>
       {/* Glow */}
       <View style={{
         position: 'absolute', left: -8, top: -8,
