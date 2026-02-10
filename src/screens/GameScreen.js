@@ -4,6 +4,7 @@ import { StyleSheet, StatusBar, TouchableWithoutFeedback, View, Text, Dimensions
 import * as Haptics from 'expo-haptics';
 import { GAME } from '../utils/constants';
 import { getHighscore, checkHighscore } from '../utils/storage';
+import { initSounds, playSound, cleanup } from '../utils/sounds';
 
 const { width: SW, height: SH } = Dimensions.get('window');
 
@@ -310,13 +311,27 @@ export default function GameScreen() {
   const [isNewHighscore, setIsNewHighscore] = useState(false);
   const [scrollOffset, setScrollOffset] = useState(0);
   const [showMenu, setShowMenu] = useState(true);
+  const [paused, setPaused] = useState(false);
   const [gameKey, setGameKey] = useState(0);
   const [currentSpeed, setCurrentSpeed] = useState(1);
   const blinkAnim = useRef(new Animated.Value(1)).current;
   const engineRef = useRef(null);
 
+  const togglePause = (e) => {
+    if (e && e.stopPropagation) e.stopPropagation();
+    if (paused) {
+      setPaused(false);
+      setRunning(true);
+    } else {
+      setPaused(true);
+      setRunning(false);
+    }
+  };
+
   useEffect(() => {
     getHighscore().then(setHighscoreState);
+    initSounds();
+    return () => cleanup();
   }, []);
 
   // Blinking animation for "TAP TO START"
@@ -357,6 +372,7 @@ export default function GameScreen() {
       setRunning(false);
       setGameOver(true);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      playSound('crash');
       const isNew = await checkHighscore(score);
       if (isNew) {
         setHighscoreState(score);
@@ -364,9 +380,11 @@ export default function GameScreen() {
       }
     } else if (e.type === 'score') {
       setScore(e.score);
-      // Milestone haptics
       if (e.score % 10 === 0) {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        playSound('milestone');
+      } else {
+        playSound('score');
       }
     }
   }, [score]);
@@ -401,6 +419,7 @@ export default function GameScreen() {
     if (entities.player) {
       entities.player.velocity = GAME.JUMP_FORCE;
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      playSound('jump');
     }
   };
 
@@ -434,7 +453,7 @@ export default function GameScreen() {
         {/* Ground */}
         <Ground />
         
-        {/* Score + Speed */}
+        {/* Score + Speed + Pause */}
         {!showMenu && !gameOver && (
           <>
             <View style={styles.scoreContainer}>
@@ -447,7 +466,22 @@ export default function GameScreen() {
                 {currentSpeed}x
               </Text>
             </View>
+            <TouchableWithoutFeedback onPress={togglePause}>
+              <View style={styles.pauseButton}>
+                <Text style={styles.pauseIcon}>{paused ? '▶' : '⏸'}</Text>
+              </View>
+            </TouchableWithoutFeedback>
           </>
+        )}
+        
+        {/* Pause Overlay */}
+        {paused && (
+          <View style={styles.overlay}>
+            <Text style={styles.pauseTitle}>PAUSED</Text>
+            <View style={styles.menuDivider} />
+            <Text style={styles.finalScore}>SCORE: {String(score).padStart(4, '0')}</Text>
+            <Animated.Text style={[styles.tapToStart, { opacity: blinkAnim }]}>TAP ▶ TO RESUME</Animated.Text>
+          </View>
         )}
         
         {/* Menu Screen */}
@@ -594,6 +628,26 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     letterSpacing: 2,
     marginBottom: 8,
+  },
+  pauseButton: {
+    position: 'absolute',
+    top: 48,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+    zIndex: 50,
+  },
+  pauseIcon: {
+    color: GAME.COLORS.TEXT_DIM,
+    fontSize: 22,
+    padding: 8,
+  },
+  pauseTitle: {
+    color: GAME.COLORS.TEXT,
+    fontSize: 48,
+    fontWeight: 'bold',
+    fontFamily: 'monospace',
+    letterSpacing: 6,
   },
   speedContainer: {
     position: 'absolute',
