@@ -10,11 +10,11 @@ const SOUND_FILES = {
   crash: require('../../assets/sounds/crash.wav'),
   score: require('../../assets/sounds/score.wav'),
   milestone: require('../../assets/sounds/milestone.wav'),
-  powerup: require('../../assets/sounds/score.wav'), // Reuse score sound for powerup
-  'shield-break': require('../../assets/sounds/crash.wav'), // Reuse crash sound for shield break
-  coin: require('../../assets/sounds/score.wav'), // Coin collect - higher pitch effect
-  'box-open': require('../../assets/sounds/powerup.wav'), // Mystery box open
-  'near-miss': require('../../assets/sounds/jump.wav'), // Near miss - whoosh sound
+  powerup: require('../../assets/sounds/score.wav'), // Reuse score for powerup
+  'shield-break': require('../../assets/sounds/crash.wav'), // Reuse crash for shield break
+  coin: require('../../assets/sounds/score.wav'), // Reuse score for coin
+  'box-open': require('../../assets/sounds/milestone.wav'), // Reuse milestone for box open
+  'near-miss': require('../../assets/sounds/jump.wav'), // Reuse jump for near miss
 };
 
 let pools = {};
