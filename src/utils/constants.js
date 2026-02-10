@@ -45,7 +45,7 @@ export const GAME = {
   MIN_OBSTACLE_HEIGHT: 40,
   MAX_OBSTACLE_HEIGHT: 180, // Increased from 120 for taller obstacles
   GAP_MIN: 140,
-  NEAR_MISS_DISTANCE: 10, // pixels for near miss detection
+  NEAR_MISS_DISTANCE: 5, // pixels for near miss detection (tight!)
   
   // Power-ups
   STAR_POINTS: 10,

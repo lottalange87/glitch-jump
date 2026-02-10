@@ -1198,18 +1198,16 @@ const CollisionSystem = (entities, { dispatch }) => {
           collision = true;
         }
         
-        // Near miss detection
-        if (!collision && !obs.nearMissTriggered && obs.x < px + pw && obs.x + obs.width > px) {
+        // Near miss detection - only when obstacle just passed player
+        if (!collision && !obs.nearMissTriggered && 
+            obs.x + obs.width < px && obs.x + obs.width > px - 8) {
+          // Obstacle just passed - check how close vertically
           const verticalDist = Math.min(
             Math.abs(py + ph - obs.y),
             Math.abs(py - (obs.y + obs.height))
           );
-          const horizontalDist = Math.min(
-            Math.abs(px + pw - obs.x),
-            Math.abs(px - (obs.x + obs.width))
-          );
           
-          if (verticalDist < GAME.NEAR_MISS_DISTANCE || horizontalDist < GAME.NEAR_MISS_DISTANCE) {
+          if (verticalDist < GAME.NEAR_MISS_DISTANCE) {
             nearMiss = true;
           }
         }
@@ -1859,16 +1857,15 @@ const styles = StyleSheet.create({
   },
   pauseButton: {
     position: 'absolute',
-    top: 48,
-    left: 0,
-    right: 0,
+    top: 90,
+    right: 20,
     alignItems: 'center',
     zIndex: 50,
   },
   pauseIcon: {
     color: GAME.COLORS.TEXT_DIM,
-    fontSize: 22,
-    padding: 8,
+    fontSize: 20,
+    padding: 10,
   },
   pauseTitle: {
     color: GAME.COLORS.TEXT,
