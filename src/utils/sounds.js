@@ -1,7 +1,9 @@
 import { Audio } from 'expo-av';
 
-let soundObjects = {};
-let initialized = false;
+// Sound pool for zero-latency playback
+// Multiple instances per sound so we don't wait for rewind
+
+const POOL_SIZE = 4;
 
 const SOUND_FILES = {
   jump: require('../../assets/sounds/jump.wav'),
@@ -9,6 +11,10 @@ const SOUND_FILES = {
   score: require('../../assets/sounds/score.wav'),
   milestone: require('../../assets/sounds/milestone.wav'),
 };
+
+let pools = {};
+let poolIndex = {};
+let initialized = false;
 
 export const initSounds = async () => {
   if (initialized) return;
@@ -18,33 +24,45 @@ export const initSounds = async () => {
       staysActiveInBackground: false,
       shouldDuckAndroid: true,
     });
-    
+
+    // Create a pool of sound instances for each sound
     for (const [name, file] of Object.entries(SOUND_FILES)) {
-      const { sound } = await Audio.Sound.createAsync(file, { volume: 0.5 });
-      soundObjects[name] = sound;
+      pools[name] = [];
+      poolIndex[name] = 0;
+      for (let i = 0; i < POOL_SIZE; i++) {
+        const { sound } = await Audio.Sound.createAsync(file, {
+          volume: name === 'jump' ? 0.4 : 0.5,
+          shouldPlay: false,
+        });
+        pools[name].push(sound);
+      }
     }
-    
+
     initialized = true;
   } catch (e) {
     console.warn('Sound init failed:', e);
   }
 };
 
-export const playSound = async (name) => {
-  try {
-    const sound = soundObjects[name];
-    if (sound) {
-      await sound.replayAsync();
-    }
-  } catch (e) {
-    // Silently fail - sounds are non-critical
-  }
+export const playSound = (name) => {
+  if (!initialized || !pools[name]) return;
+
+  // Round-robin through pool — grab next instance immediately
+  const idx = poolIndex[name];
+  const sound = pools[name][idx];
+  poolIndex[name] = (idx + 1) % POOL_SIZE;
+
+  // Fire and forget — no await = no delay
+  sound.setPositionAsync(0).then(() => sound.playAsync()).catch(() => {});
 };
 
 export const cleanup = async () => {
-  for (const sound of Object.values(soundObjects)) {
-    try { await sound.unloadAsync(); } catch {}
+  for (const pool of Object.values(pools)) {
+    for (const sound of pool) {
+      try { await sound.unloadAsync(); } catch {}
+    }
   }
-  soundObjects = {};
+  pools = {};
+  poolIndex = {};
   initialized = false;
 };
