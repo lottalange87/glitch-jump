@@ -1198,16 +1198,17 @@ const CollisionSystem = (entities, { dispatch }) => {
           collision = true;
         }
         
-        // Near miss detection - only when obstacle just passed player
-        if (!collision && !obs.nearMissTriggered && 
-            obs.x + obs.width < px && obs.x + obs.width > px - 8) {
-          // Obstacle just passed - check how close vertically
-          const verticalDist = Math.min(
-            Math.abs(py + ph - obs.y),
-            Math.abs(py - (obs.y + obs.height))
-          );
+        // Near miss detection - check closest distance to obstacle edges
+        if (!collision && !obs.nearMissTriggered && obs.scored) {
+          // Only after obstacle is scored (passed the player x)
+          // Calculate actual shortest distance from player to obstacle
+          const closestX = Math.max(obs.x, Math.min(px + pw / 2, obs.x + obs.width));
+          const closestY = Math.max(obs.y, Math.min(py + ph / 2, obs.y + obs.height));
+          const distX = Math.abs(px + pw / 2 - closestX);
+          const distY = Math.abs(py + ph / 2 - closestY);
+          const dist = Math.sqrt(distX * distX + distY * distY) - pw / 2;
           
-          if (verticalDist < GAME.NEAR_MISS_DISTANCE) {
+          if (dist < GAME.NEAR_MISS_DISTANCE && dist >= 0) {
             nearMiss = true;
           }
         }
@@ -1857,9 +1858,8 @@ const styles = StyleSheet.create({
   },
   pauseButton: {
     position: 'absolute',
-    top: 90,
-    right: 20,
-    alignItems: 'center',
+    top: 50,
+    left: 20,
     zIndex: 50,
   },
   pauseIcon: {
