@@ -639,34 +639,56 @@ const SpawnSystem = (entities, { time, dispatch }) => {
 const spawnObstacle = (entities, state) => {
   const id = `obs_${Date.now()}_${Math.random()}`;
   
-  // Random obstacle type with weights
+  // Dynamic probabilities based on speed - more mid-air at higher speeds
+  const speedFactor = Math.min(1, (state.speed - GAME.BASE_SPEED) / (GAME.MAX_SPEED - GAME.BASE_SPEED));
+  
+  // Weights shift as speed increases:
+  // Floor: 30% → 15%, Ceiling: 25% → 15%, Mid: 20% → 35%, Moving: 13% → 20%, Slalom: 12% → 15%
+  const floorWeight = 0.30 - (speedFactor * 0.15);      // 30% → 15%
+  const ceilingWeight = 0.25 - (speedFactor * 0.10);    // 25% → 15%
+  const midWeight = 0.20 + (speedFactor * 0.15);        // 20% → 35%
+  const movingWeight = 0.13 + (speedFactor * 0.07);     // 13% → 20%
+  // Slalom gets remainder
+  
   const type = Math.random();
   let obsY, obsH, obstacleType = 'normal', totalWidth, gapY;
   
-  if (type < 0.3) {
+  if (type < floorWeight) {
     // Floor spike
     obsH = GAME.MIN_OBSTACLE_HEIGHT + Math.random() * (GAME.MAX_OBSTACLE_HEIGHT - GAME.MIN_OBSTACLE_HEIGHT);
     obsY = GAME.FLOOR_Y - obsH;
-  } else if (type < 0.55) {
+  } else if (type < floorWeight + ceilingWeight) {
     // Ceiling spike
     obsH = GAME.MIN_OBSTACLE_HEIGHT + Math.random() * 60;
     obsY = 0;
     obstacleType = 'ceiling';
-  } else if (type < 0.75) {
-    // Mid-air block
-    obsH = 30 + Math.random() * 40;
-    obsY = 100 + Math.random() * (GAME.FLOOR_Y - 200);
+  } else if (type < floorWeight + ceilingWeight + midWeight) {
+    // Mid-air block - more variety in height
+    const midType = Math.random();
+    if (midType < 0.33) {
+      // Low mid (just above floor)
+      obsH = 30 + Math.random() * 40;
+      obsY = GAME.FLOOR_Y - 100 - Math.random() * 80;
+    } else if (midType < 0.66) {
+      // Center mid
+      obsH = 25 + Math.random() * 35;
+      obsY = 120 + Math.random() * (GAME.FLOOR_Y - 300);
+    } else {
+      // High mid (near ceiling)
+      obsH = 30 + Math.random() * 30;
+      obsY = 40 + Math.random() * 60;
+    }
     obstacleType = 'mid';
-  } else if (type < 0.88) {
+  } else if (type < floorWeight + ceilingWeight + midWeight + movingWeight) {
     // Moving block
     obsH = 40 + Math.random() * 30;
-    obsY = 120 + Math.random() * (GAME.FLOOR_Y - 250);
+    obsY = 100 + Math.random() * (GAME.FLOOR_Y - 220);
     obstacleType = 'moving';
   } else {
     // Slalom gate
     obstacleType = 'slalom';
     totalWidth = 100 + Math.random() * 60;
-    gapY = 60 + Math.random() * (GAME.FLOOR_Y - 200);
+    gapY = 80 + Math.random() * (GAME.FLOOR_Y - 220);
     obsH = 120;
   }
   
