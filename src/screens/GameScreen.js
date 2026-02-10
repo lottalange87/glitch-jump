@@ -310,6 +310,7 @@ export default function GameScreen() {
   const [isNewHighscore, setIsNewHighscore] = useState(false);
   const [scrollOffset, setScrollOffset] = useState(0);
   const [showMenu, setShowMenu] = useState(true);
+  const [gameKey, setGameKey] = useState(0);
   const engineRef = useRef(null);
 
   useEffect(() => {
@@ -359,22 +360,26 @@ export default function GameScreen() {
   const handleTap = () => {
     if (showMenu) {
       // Start game
+      const newEntities = createEntities();
       setShowMenu(false);
-      setEntities(createEntities());
       setScore(0);
       setGameOver(false);
       setIsNewHighscore(false);
-      setRunning(true);
+      setGameKey(k => k + 1);
+      setEntities(newEntities);
+      setTimeout(() => setRunning(true), 50);
       return;
     }
     
     if (gameOver) {
       // Restart
-      setEntities(createEntities());
+      const newEntities = createEntities();
       setScore(0);
       setGameOver(false);
       setIsNewHighscore(false);
-      setRunning(true);
+      setGameKey(k => k + 1);
+      setEntities(newEntities);
+      setTimeout(() => setRunning(true), 50);
       return;
     }
     
@@ -449,6 +454,7 @@ export default function GameScreen() {
         
         {/* Game Engine */}
         <GameEngine
+          key={gameKey}
           ref={engineRef}
           style={styles.game}
           systems={[Physics, SpawnSystem, CollisionSystem]}
