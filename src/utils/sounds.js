@@ -10,6 +10,8 @@ const SOUND_FILES = {
   crash: require('../../assets/sounds/crash.wav'),
   score: require('../../assets/sounds/score.wav'),
   milestone: require('../../assets/sounds/milestone.wav'),
+  powerup: require('../../assets/sounds/score.wav'), // Reuse score sound for powerup (higher pitch would be ideal)
+  'shield-break': require('../../assets/sounds/crash.wav'), // Reuse crash sound for shield break (softer would be ideal)
 };
 
 let pools = {};
