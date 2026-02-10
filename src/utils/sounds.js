@@ -10,8 +10,11 @@ const SOUND_FILES = {
   crash: require('../../assets/sounds/crash.wav'),
   score: require('../../assets/sounds/score.wav'),
   milestone: require('../../assets/sounds/milestone.wav'),
-  powerup: require('../../assets/sounds/score.wav'), // Reuse score sound for powerup (higher pitch would be ideal)
-  'shield-break': require('../../assets/sounds/crash.wav'), // Reuse crash sound for shield break (softer would be ideal)
+  powerup: require('../../assets/sounds/score.wav'), // Reuse score sound for powerup
+  'shield-break': require('../../assets/sounds/crash.wav'), // Reuse crash sound for shield break
+  coin: require('../../assets/sounds/score.wav'), // Coin collect - higher pitch effect
+  'box-open': require('../../assets/sounds/powerup.wav'), // Mystery box open
+  'near-miss': require('../../assets/sounds/jump.wav'), // Near miss - whoosh sound
 };
 
 let pools = {};
@@ -46,7 +49,7 @@ export const initSounds = async () => {
   }
 };
 
-export const playSound = (name) => {
+export const playSound = (name, options = {}) => {
   if (!initialized || !pools[name]) return;
 
   // Round-robin through pool — grab next instance immediately
@@ -55,7 +58,24 @@ export const playSound = (name) => {
   poolIndex[name] = (idx + 1) % POOL_SIZE;
 
   // Fire and forget — no await = no delay
+  const volume = options.volume !== undefined ? options.volume : 0.5;
+  sound.setVolumeAsync(volume).catch(() => {});
   sound.setPositionAsync(0).then(() => sound.playAsync()).catch(() => {});
+};
+
+// Play coin sound with higher pitch effect (using volume modulation)
+export const playCoinSound = () => {
+  playSound('coin', { volume: 0.7 });
+};
+
+// Play box open sound
+export const playBoxOpenSound = () => {
+  playSound('box-open', { volume: 0.8 });
+};
+
+// Play near miss sound
+export const playNearMissSound = () => {
+  playSound('near-miss', { volume: 0.5 });
 };
 
 export const cleanup = async () => {

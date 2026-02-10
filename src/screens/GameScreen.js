@@ -2,9 +2,9 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { GameEngine } from 'react-native-game-engine';
 import { StyleSheet, StatusBar, TouchableWithoutFeedback, View, Text, Dimensions, Animated } from 'react-native';
 import * as Haptics from 'expo-haptics';
-import { GAME } from '../utils/constants';
-import { getHighscore, checkHighscore } from '../utils/storage';
-import { initSounds, playSound, cleanup } from '../utils/sounds';
+import { GAME, CHARACTER_SKINS } from '../utils/constants';
+import { getHighscore, checkHighscore, getCoins, addCoins, getMysteryBoxes, openMysteryBoxReward, getSkinData, setCurrentSkin, purchaseSkin } from '../utils/storage';
+import { initSounds, playSound, playCoinSound, playBoxOpenSound, playNearMissSound, cleanup } from '../utils/sounds';
 
 const { width: SW, height: SH } = Dimensions.get('window');
 
@@ -12,11 +12,12 @@ const { width: SW, height: SH } = Dimensions.get('window');
 // RENDERERS
 // ============================================
 
-// Pixel-art style player with face
+// Pixel-art style player with face - supports skins
 const Player = (props) => {
   const s = props.width || GAME.PLAYER_SIZE;
   const hasShield = props.shieldTime > 0;
   const shieldOpacity = hasShield ? Math.min(1, props.shieldTime / 500) : 0;
+  const skin = props.skin || CHARACTER_SKINS[0];
   
   return (
     <View style={{
@@ -49,15 +50,15 @@ const Player = (props) => {
       <View style={{
         position: 'absolute', left: -4, top: -4,
         width: s + 8, height: s + 8,
-        backgroundColor: hasShield ? 'rgba(0,204,255,0.25)' : 'rgba(0,255,136,0.15)',
+        backgroundColor: hasShield ? 'rgba(0,204,255,0.25)' : skin.glowColor + '26',
         borderRadius: 4,
       }} />
       {/* Body */}
       <View style={{
         width: s, height: s,
-        backgroundColor: hasShield ? GAME.COLORS.PLAYER : GAME.COLORS.PLAYER,
+        backgroundColor: skin.color,
         borderWidth: 2,
-        borderColor: hasShield ? GAME.COLORS.PLAYER_SHIELD : GAME.COLORS.PLAYER_GLOW,
+        borderColor: hasShield ? GAME.COLORS.PLAYER_SHIELD : skin.glowColor,
         borderRadius: 3,
       }}>
         {/* Eyes */}
@@ -68,8 +69,8 @@ const Player = (props) => {
           paddingTop: 6,
           gap: 3,
         }}>
-          <View style={{ width: 4, height: 4, backgroundColor: '#0f0e17', borderRadius: 1 }} />
-          <View style={{ width: 4, height: 4, backgroundColor: '#0f0e17', borderRadius: 1 }} />
+          <View style={{ width: 4, height: 4, backgroundColor: skin.eyeColor, borderRadius: 1 }} />
+          <View style={{ width: 4, height: 4, backgroundColor: skin.eyeColor, borderRadius: 1 }} />
         </View>
       </View>
     </View>
@@ -489,6 +490,414 @@ const SlowMoOverlay = ({ active }) => {
   );
 };
 
+// Near Miss text overlay
+const NearMissText = ({ visible }) => {
+  const opacity = useRef(new Animated.Value(0)).current;
+  const scale = useRef(new Animated.Value(0.5)).current;
+  
+  useEffect(() => {
+    if (visible) {
+      Animated.parallel([
+        Animated.sequence([
+          Animated.timing(opacity, { toValue: 1, duration: 100, useNativeDriver: true }),
+          Animated.delay(800),
+          Animated.timing(opacity, { toValue: 0, duration: 200, useNativeDriver: true }),
+        ]),
+        Animated.sequence([
+          Animated.timing(scale, { toValue: 1.2, duration: 150, useNativeDriver: true }),
+          Animated.timing(scale, { toValue: 1, duration: 100, useNativeDriver: true }),
+        ]),
+      ]).start();
+    }
+  }, [visible]);
+  
+  if (!visible) return null;
+  
+  return (
+    <Animated.View style={{
+      position: 'absolute',
+      top: '35%',
+      left: 0,
+      right: 0,
+      alignItems: 'center',
+      zIndex: 60,
+      pointerEvents: 'none',
+      opacity,
+      transform: [{ scale }],
+    }}>
+      <Text style={{
+        fontSize: 32,
+        fontWeight: 'bold',
+        fontFamily: 'monospace',
+        color: GAME.COLORS.NEAR_MISS,
+        textShadowColor: GAME.COLORS.NEAR_MISS,
+        textShadowOffset: { width: 0, height: 0 },
+        textShadowRadius: 20,
+        letterSpacing: 4,
+      }}>NEAR MISS!</Text>
+      <Text style={{
+        fontSize: 14,
+        fontFamily: 'monospace',
+        color: GAME.COLORS.COIN,
+        marginTop: 4,
+      }}>+{GAME.NEAR_MISS_BONUS_COINS} coins</Text>
+    </Animated.View>
+  );
+};
+
+// Coin Counter Display
+const CoinCounter = ({ coins }) => (
+  <View style={{
+    position: 'absolute',
+    top: 50,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+    zIndex: 50,
+  }}>
+    <View style={{
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: 'rgba(0,0,0,0.4)',
+      borderRadius: 20,
+      paddingHorizontal: 16,
+      paddingVertical: 6,
+      borderWidth: 1,
+      borderColor: 'rgba(255,204,0,0.3)',
+    }}>
+      <Text style={{
+        fontSize: 20,
+        marginRight: 6,
+      }}>🪙</Text>
+      <Text style={{
+        color: GAME.COLORS.COIN,
+        fontSize: 20,
+        fontWeight: 'bold',
+        fontFamily: 'monospace',
+        textShadowColor: GAME.COLORS.COIN_GLOW,
+        textShadowOffset: { width: 0, height: 0 },
+        textShadowRadius: 8,
+      }}>{coins}</Text>
+    </View>
+  </View>
+);
+
+// Mystery Box Renderer
+const MysteryBoxRenderer = ({ shaking, onOpen, count }) => {
+  const shakeAnim = useRef(new Animated.Value(0)).current;
+  
+  useEffect(() => {
+    if (shaking) {
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(shakeAnim, { toValue: -5, duration: 50, useNativeDriver: true }),
+          Animated.timing(shakeAnim, { toValue: 5, duration: 50, useNativeDriver: true }),
+          Animated.timing(shakeAnim, { toValue: 0, duration: 50, useNativeDriver: true }),
+        ])
+      ).start();
+    } else {
+      shakeAnim.setValue(0);
+    }
+    return () => shakeAnim.setValue(0);
+  }, [shaking]);
+  
+  return (
+    <TouchableWithoutFeedback onPress={onOpen}>
+      <View style={{
+        alignItems: 'center',
+        marginTop: 20,
+      }}>
+        <Animated.View style={{
+          width: 70,
+          height: 70,
+          backgroundColor: GAME.COLORS.MYSTERY_BOX,
+          borderRadius: 8,
+          borderWidth: 3,
+          borderColor: '#8844cc',
+          justifyContent: 'center',
+          alignItems: 'center',
+          transform: [{ translateX: shakeAnim }],
+          shadowColor: GAME.COLORS.MYSTERY_BOX,
+          shadowOffset: { width: 0, height: 0 },
+          shadowOpacity: 0.8,
+          shadowRadius: 15,
+          elevation: 10,
+        }}>
+          <Text style={{
+            fontSize: 36,
+          }}>🎁</Text>
+          <View style={{
+            position: 'absolute',
+            top: -8,
+            right: -8,
+            backgroundColor: GAME.COLORS.OBSTACLE,
+            borderRadius: 12,
+            minWidth: 24,
+            height: 24,
+            justifyContent: 'center',
+            alignItems: 'center',
+            borderWidth: 2,
+            borderColor: '#fff',
+          }}>
+            <Text style={{
+              color: '#fff',
+              fontSize: 12,
+              fontWeight: 'bold',
+              fontFamily: 'monospace',
+            }}>{count}</Text>
+          </View>
+        </Animated.View>
+        <Text style={{
+          color: GAME.COLORS.TEXT_DIM,
+          fontSize: 12,
+          fontFamily: 'monospace',
+          marginTop: 8,
+          letterSpacing: 1,
+        }}>TAP TO OPEN</Text>
+      </View>
+    </TouchableWithoutFeedback>
+  );
+};
+
+// Character Selector Component
+const CharacterSelector = ({ skins, onSelect, onPurchase, coins }) => {
+  const [currentIndex, setCurrentIndex] = useState(0);
+  
+  const currentSkin = skins[currentIndex] || CHARACTER_SKINS[0];
+  const canAfford = coins >= currentSkin.unlockCost;
+  
+  const goNext = () => {
+    setCurrentIndex((prev) => (prev + 1) % skins.length);
+  };
+  
+  const goPrev = () => {
+    setCurrentIndex((prev) => (prev - 1 + skins.length) % skins.length);
+  };
+  
+  const handleAction = () => {
+    if (currentSkin.unlocked) {
+      onSelect(currentSkin.id);
+    } else if (canAfford) {
+      onPurchase(currentSkin.id);
+    }
+  };
+  
+  return (
+    <View style={{
+      alignItems: 'center',
+      marginVertical: 20,
+    }}>
+      <Text style={{
+        color: GAME.COLORS.TEXT_DIM,
+        fontSize: 12,
+        fontFamily: 'monospace',
+        letterSpacing: 2,
+        marginBottom: 10,
+      }}>SELECT CHARACTER</Text>
+      
+      <View style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+      }}>
+        <TouchableWithoutFeedback onPress={goPrev}>
+          <View style={{
+            padding: 10,
+          }}>
+            <Text style={{
+              color: GAME.COLORS.TEXT,
+              fontSize: 24,
+            }}>◀</Text>
+          </View>
+        </TouchableWithoutFeedback>
+        
+        <View style={{
+          width: 80,
+          height: 80,
+          backgroundColor: currentSkin.color,
+          borderRadius: 8,
+          borderWidth: 3,
+          borderColor: currentSkin.isSelected ? GAME.COLORS.ACCENT : currentSkin.glowColor,
+          justifyContent: 'center',
+          alignItems: 'center',
+          marginHorizontal: 10,
+        }}>
+          <View style={{
+            flexDirection: 'row',
+            gap: 4,
+          }}>
+            <View style={{ width: 8, height: 8, backgroundColor: currentSkin.eyeColor, borderRadius: 2 }} />
+            <View style={{ width: 8, height: 8, backgroundColor: currentSkin.eyeColor, borderRadius: 2 }} />
+          </View>
+          {currentSkin.isSelected && (
+            <Text style={{
+              position: 'absolute',
+              bottom: 4,
+              fontSize: 10,
+              color: GAME.COLORS.ACCENT,
+              fontFamily: 'monospace',
+            }}>✓</Text>
+          )}
+        </View>
+        
+        <TouchableWithoutFeedback onPress={goNext}>
+          <View style={{
+            padding: 10,
+          }}>
+            <Text style={{
+              color: GAME.COLORS.TEXT,
+              fontSize: 24,
+            }}>▶</Text>
+          </View>
+        </TouchableWithoutFeedback>
+      </View>
+      
+      <Text style={{
+        color: GAME.COLORS.TEXT,
+        fontSize: 16,
+        fontFamily: 'monospace',
+        marginTop: 8,
+        letterSpacing: 1,
+      }}>{currentSkin.name}</Text>
+      
+      <TouchableWithoutFeedback onPress={handleAction}>
+        <View style={{
+          marginTop: 10,
+          backgroundColor: currentSkin.unlocked 
+            ? (currentSkin.isSelected ? 'rgba(0,255,136,0.2)' : 'rgba(0,255,136,0.4)')
+            : (canAfford ? 'rgba(255,136,0,0.6)' : 'rgba(100,100,100,0.4)'),
+          paddingHorizontal: 20,
+          paddingVertical: 8,
+          borderRadius: 20,
+          borderWidth: 1,
+          borderColor: currentSkin.unlocked 
+            ? GAME.COLORS.PLAYER 
+            : (canAfford ? GAME.COLORS.ACCENT : '#666'),
+        }}>
+          <Text style={{
+            color: currentSkin.unlocked ? GAME.COLORS.PLAYER : (canAfford ? GAME.COLORS.ACCENT : '#666'),
+            fontSize: 12,
+            fontFamily: 'monospace',
+            fontWeight: 'bold',
+            letterSpacing: 1,
+          }}>
+            {currentSkin.unlocked 
+              ? (currentSkin.isSelected ? 'SELECTED' : 'SELECT')
+              : `${currentSkin.unlockCost} 🪙`
+            }
+          </Text>
+        </View>
+      </TouchableWithoutFeedback>
+    </View>
+  );
+};
+
+// Mystery Box Reward Modal
+const MysteryBoxModal = ({ visible, reward, onClose }) => {
+  if (!visible || !reward) return null;
+  
+  return (
+    <View style={{
+      position: 'absolute',
+      top: 0, left: 0, right: 0, bottom: 0,
+      backgroundColor: 'rgba(15,14,23,0.95)',
+      justifyContent: 'center',
+      alignItems: 'center',
+      zIndex: 100,
+    }}>
+      <Text style={{
+        color: GAME.COLORS.MYSTERY_BOX,
+        fontSize: 24,
+        fontWeight: 'bold',
+        fontFamily: 'monospace',
+        letterSpacing: 4,
+        marginBottom: 20,
+      }}>MYSTERY BOX</Text>
+      
+      <View style={{
+        width: 100,
+        height: 100,
+        backgroundColor: GAME.COLORS.MYSTERY_BOX,
+        borderRadius: 12,
+        borderWidth: 4,
+        borderColor: '#8844cc',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginBottom: 30,
+      }}>
+        <Text style={{
+          fontSize: 50,
+        }}>{reward.type === 'character' ? '🎉' : '🪙'}</Text>
+      </View>
+      
+      {reward.type === 'character' ? (
+        <>
+          <Text style={{
+            color: GAME.COLORS.TEXT,
+            fontSize: 20,
+            fontFamily: 'monospace',
+            marginBottom: 10,
+          }}>NEW CHARACTER!</Text>
+          <View style={{
+            width: 60,
+            height: 60,
+            backgroundColor: reward.skin.color,
+            borderRadius: 8,
+            justifyContent: 'center',
+            alignItems: 'center',
+            marginBottom: 10,
+          }}>
+            <View style={{ flexDirection: 'row', gap: 3 }}>
+              <View style={{ width: 6, height: 6, backgroundColor: reward.skin.eyeColor }} />
+              <View style={{ width: 6, height: 6, backgroundColor: reward.skin.eyeColor }} />
+            </View>
+          </View>
+          <Text style={{
+            color: GAME.COLORS.ACCENT,
+            fontSize: 18,
+            fontFamily: 'monospace',
+            fontWeight: 'bold',
+          }}>{reward.skin.name}</Text>
+        </>
+      ) : (
+        <>
+          <Text style={{
+            color: GAME.COLORS.TEXT,
+            fontSize: 20,
+            fontFamily: 'monospace',
+          }}>COIN REFUND!</Text>
+          <Text style={{
+            color: GAME.COLORS.COIN,
+            fontSize: 48,
+            fontWeight: 'bold',
+            fontFamily: 'monospace',
+            marginVertical: 10,
+            textShadowColor: GAME.COLORS.COIN_GLOW,
+            textShadowOffset: { width: 0, height: 0 },
+            textShadowRadius: 15,
+          }}>+{reward.amount}</Text>
+        </>
+      )}
+      
+      <TouchableWithoutFeedback onPress={onClose}>
+        <View style={{
+          marginTop: 30,
+          backgroundColor: GAME.COLORS.PLAYER,
+          paddingHorizontal: 30,
+          paddingVertical: 12,
+          borderRadius: 25,
+        }}>
+          <Text style={{
+            color: '#0f0e17',
+            fontSize: 14,
+            fontWeight: 'bold',
+            fontFamily: 'monospace',
+          }}>AWESOME!</Text>
+        </View>
+      </TouchableWithoutFeedback>
+    </View>
+  );
+};
+
 // ============================================
 // GAME SYSTEMS
 // ============================================
@@ -547,18 +956,20 @@ const Physics = (entities, { time, dispatch }) => {
       // Update moving blocks
       if (obs.type === 'moving') {
         obs.moveTimer = (obs.moveTimer || 0) + 16 * timeScale;
-        const moveCycle = 2000; // 2 second cycle
+        const moveCycle = 2000;
         const moveProgress = (obs.moveTimer % moveCycle) / moveCycle;
         const moveRange = obs.moveRange || 80;
         const baseY = obs.baseY || obs.y;
         obs.y = baseY + Math.sin(moveProgress * Math.PI * 2) * (moveRange / 2);
       }
       
-      // Score when passing obstacle (only count main obstacles, not slalom parts)
+      // Score when passing obstacle
       if (!obs.scored && obs.x + (obs.totalWidth || obs.width) < player.x && obs.givesScore !== false) {
         obs.scored = true;
         state.score++;
+        state.coins += GAME.POINTS_PER_COIN;
         dispatch({ type: 'score', score: state.score });
+        dispatch({ type: 'coin-collect', amount: GAME.POINTS_PER_COIN });
       }
       
       // Remove off-screen
@@ -590,19 +1001,19 @@ const SpawnSystem = (entities, { time, dispatch }) => {
   const timeScale = state.slowMoTime > 0 ? GAME.SLOWMO_FACTOR : 1;
   state.spawnTimer += 16 * timeScale;
   
-  // Dynamic spawn rate based on speed - more aggressive at higher speeds
+  // Dynamic spawn rate based on speed
   const speedFactor = (state.speed - GAME.BASE_SPEED) / (GAME.MAX_SPEED - GAME.BASE_SPEED);
-  const baseInterval = GAME.MAX_SPAWN_MS - (speedFactor * 800); // Spawn faster as speed increases
+  const baseInterval = GAME.MAX_SPAWN_MS - (speedFactor * 800);
   const spawnInterval = Math.max(GAME.MIN_SPAWN_MS, baseInterval);
   
   if (state.spawnTimer >= spawnInterval) {
     state.spawnTimer = 0;
     
-    // Check for cluster spawn (2-3 obstacles in quick succession)
-    const clusterChance = Math.min(0.35, 0.15 + speedFactor * 0.2); // Increases with speed
+    // Check for cluster spawn
+    const clusterChance = Math.min(0.35, 0.15 + speedFactor * 0.2);
     if (Math.random() < clusterChance && !state.clusterSpawnRemaining) {
-      state.clusterSpawnRemaining = Math.floor(Math.random() * 2) + 2; // 2-3 obstacles
-      state.clusterGap = 400 + Math.random() * 300; // Gap between cluster obstacles
+      state.clusterSpawnRemaining = Math.floor(Math.random() * 2) + 2;
+      state.clusterGap = 400 + Math.random() * 300;
     }
     
     // Spawn obstacle
@@ -614,7 +1025,7 @@ const SpawnSystem = (entities, { time, dispatch }) => {
       state.spawnTimer = spawnInterval - state.clusterGap;
     }
     
-    // Random chance to spawn power-up (not during cluster)
+    // Random chance to spawn power-up
     if (!state.clusterSpawnRemaining && Math.random() < 0.40) {
       spawnPowerUp(entities, state);
     }
@@ -626,53 +1037,41 @@ const SpawnSystem = (entities, { time, dispatch }) => {
 const spawnObstacle = (entities, state) => {
   const id = `obs_${Date.now()}_${Math.random()}`;
   
-  // Dynamic probabilities based on speed - more mid-air at higher speeds
   const speedFactor = Math.min(1, (state.speed - GAME.BASE_SPEED) / (GAME.MAX_SPEED - GAME.BASE_SPEED));
   
-  // Weights shift as speed increases:
-  // Floor: 20% → 10%, Ceiling: 15% → 10%, Mid: 35% → 45%, Moving: 18% → 22%, Slalom: 12% → 13%
-  const floorWeight = 0.20 - (speedFactor * 0.10);      // 20% → 10%
-  const ceilingWeight = 0.15 - (speedFactor * 0.05);    // 15% → 10%
-  const midWeight = 0.35 + (speedFactor * 0.10);        // 35% → 45%
-  const movingWeight = 0.18 + (speedFactor * 0.04);     // 18% → 22%
-  // Slalom gets remainder
+  const floorWeight = 0.20 - (speedFactor * 0.10);
+  const ceilingWeight = 0.15 - (speedFactor * 0.05);
+  const midWeight = 0.35 + (speedFactor * 0.10);
+  const movingWeight = 0.18 + (speedFactor * 0.04);
   
   const type = Math.random();
   let obsY, obsH, obstacleType = 'normal', totalWidth, gapY;
   
   if (type < floorWeight) {
-    // Floor spike
     obsH = GAME.MIN_OBSTACLE_HEIGHT + Math.random() * (GAME.MAX_OBSTACLE_HEIGHT - GAME.MIN_OBSTACLE_HEIGHT);
     obsY = GAME.FLOOR_Y - obsH;
   } else if (type < floorWeight + ceilingWeight) {
-    // Ceiling spike
     obsH = GAME.MIN_OBSTACLE_HEIGHT + Math.random() * 60;
     obsY = 0;
     obstacleType = 'ceiling';
   } else if (type < floorWeight + ceilingWeight + midWeight) {
-    // Mid-air block - more variety in height
     const midType = Math.random();
     if (midType < 0.33) {
-      // Low mid (just above floor)
       obsH = 30 + Math.random() * 40;
       obsY = GAME.FLOOR_Y - 100 - Math.random() * 80;
     } else if (midType < 0.66) {
-      // Center mid
       obsH = 25 + Math.random() * 35;
       obsY = 120 + Math.random() * (GAME.FLOOR_Y - 300);
     } else {
-      // High mid (near ceiling)
       obsH = 30 + Math.random() * 30;
       obsY = 40 + Math.random() * 60;
     }
     obstacleType = 'mid';
   } else if (type < floorWeight + ceilingWeight + midWeight + movingWeight) {
-    // Moving block
     obsH = 40 + Math.random() * 30;
     obsY = 100 + Math.random() * (GAME.FLOOR_Y - 220);
     obstacleType = 'moving';
   } else {
-    // Slalom gate
     obstacleType = 'slalom';
     totalWidth = 100 + Math.random() * 60;
     gapY = 80 + Math.random() * (GAME.FLOOR_Y - 220);
@@ -722,7 +1121,6 @@ const spawnObstacle = (entities, state) => {
 const spawnPowerUp = (entities, state) => {
   const id = `powerup_${Date.now()}_${Math.random()}`;
   
-  // Random power-up type
   const powerUpType = Math.random();
   let type, renderer, yPos;
   
@@ -737,7 +1135,6 @@ const spawnPowerUp = (entities, state) => {
     renderer = SlowMoRenderer;
   }
   
-  // Position power-up at a reachable height
   yPos = 80 + Math.random() * (GAME.FLOOR_Y - 160);
   
   entities[id] = {
@@ -758,19 +1155,16 @@ const CollisionSystem = (entities, { dispatch }) => {
   
   const px = player.x, py = player.y;
   const pw = player.width, ph = player.height;
-  // Slightly smaller hitbox for fairness
   const margin = 4;
   
-  // Check obstacle collisions
   Object.keys(entities).forEach(key => {
     if (key.startsWith('obs_')) {
       const obs = entities[key];
       let collision = false;
+      let nearMiss = false;
       
       if (obs.type === 'slalom') {
-        // Slalom gate collision - check left and right pillars
         const w = GAME.OBSTACLE_WIDTH;
-        const gapWidth = obs.totalWidth - w * 2;
         
         // Left pillar
         if (px + margin < obs.x + w && px + pw - margin > obs.x &&
@@ -787,17 +1181,49 @@ const CollisionSystem = (entities, { dispatch }) => {
             py + margin < obs.y + 20 && py + ph - margin > obs.y) {
           collision = true;
         }
+        
+        // Near miss detection for slalom
+        if (!collision && !obs.nearMissTriggered &&
+            px + pw > obs.x && px < obs.x + obs.totalWidth) {
+          const distToLeft = Math.abs(px + pw - obs.x);
+          const distToRight = Math.abs(px - (obs.x + obs.totalWidth));
+          if (distToLeft < GAME.NEAR_MISS_DISTANCE || distToRight < GAME.NEAR_MISS_DISTANCE) {
+            nearMiss = true;
+          }
+        }
       } else {
         // Standard obstacle collision
         if (px + margin < obs.x + obs.width && px + pw - margin > obs.x &&
             py + margin < obs.y + obs.height && py + ph - margin > obs.y) {
           collision = true;
         }
+        
+        // Near miss detection
+        if (!collision && !obs.nearMissTriggered && obs.x < px + pw && obs.x + obs.width > px) {
+          const verticalDist = Math.min(
+            Math.abs(py + ph - obs.y),
+            Math.abs(py - (obs.y + obs.height))
+          );
+          const horizontalDist = Math.min(
+            Math.abs(px + pw - obs.x),
+            Math.abs(px - (obs.x + obs.width))
+          );
+          
+          if (verticalDist < GAME.NEAR_MISS_DISTANCE || horizontalDist < GAME.NEAR_MISS_DISTANCE) {
+            nearMiss = true;
+          }
+        }
+      }
+      
+      if (nearMiss) {
+        obs.nearMissTriggered = true;
+        state.nearMissCount++;
+        state.coins += GAME.NEAR_MISS_BONUS_COINS;
+        dispatch({ type: 'near-miss' });
       }
       
       if (collision) {
         if (state.shieldTime > 0) {
-          // Shield protects - destroy obstacle and continue
           state.shieldTime = 0;
           delete entities[key];
           dispatch({ type: 'shield-break' });
@@ -814,13 +1240,13 @@ const CollisionSystem = (entities, { dispatch }) => {
       if (px < powerup.x + powerup.width && px + pw > powerup.x &&
           py < powerup.y + powerup.height && py + ph > powerup.y) {
         
-        // Collect power-up
         dispatch({ type: 'powerup-collect', powerupType: powerup.type });
         
-        // Apply effect
         if (powerup.type === 'star') {
           state.score += GAME.STAR_POINTS;
+          state.coins += GAME.STAR_COINS;
           dispatch({ type: 'score', score: state.score });
+          dispatch({ type: 'coin-collect', amount: GAME.STAR_COINS });
         } else if (powerup.type === 'shield') {
           state.shieldTime = GAME.SHIELD_DURATION;
         } else if (powerup.type === 'slowmo') {
@@ -852,6 +1278,29 @@ export default function GameScreen() {
   const [currentSpeed, setCurrentSpeed] = useState(1);
   const [shieldActive, setShieldActive] = useState(false);
   const [slowMoActive, setSlowMoActive] = useState(false);
+  
+  // Coin system
+  const [coins, setCoins] = useState(0);
+  const [sessionCoins, setSessionCoins] = useState(0);
+  const [coinsAtStart, setCoinsAtStart] = useState(0);
+  
+  // Near miss
+  const [showNearMiss, setShowNearMiss] = useState(false);
+  
+  // Character skins
+  const [skins, setSkins] = useState(CHARACTER_SKINS.map(s => ({ ...s, isSelected: s.id === 'default' })));
+  const [currentSkin, setCurrentSkin] = useState(CHARACTER_SKINS[0]);
+  
+  // Mystery boxes
+  const [mysteryBoxes, setMysteryBoxes] = useState(0);
+  const [boxShaking, setBoxShaking] = useState(false);
+  const [showBoxReward, setShowBoxReward] = useState(false);
+  const [boxReward, setBoxReward] = useState(null);
+  
+  // Game Over messages
+  const [nearHighscore, setNearHighscore] = useState(false);
+  const [pointsFromHighscore, setPointsFromHighscore] = useState(0);
+  
   const blinkAnim = useRef(new Animated.Value(1)).current;
   const engineRef = useRef(null);
 
@@ -867,12 +1316,28 @@ export default function GameScreen() {
   };
 
   useEffect(() => {
-    getHighscore().then(setHighscoreState);
+    const loadData = async () => {
+      const [hs, coinTotal, boxCount, skinData, currentSkinId] = await Promise.all([
+        getHighscore(),
+        getCoins(),
+        getMysteryBoxes(),
+        getSkinData(),
+        getCurrentSkin(),
+      ]);
+      setHighscoreState(hs);
+      setCoins(coinTotal);
+      setCoinsAtStart(coinTotal);
+      setMysteryBoxes(boxCount);
+      setSkins(skinData);
+      const selected = CHARACTER_SKINS.find(s => s.id === currentSkinId) || CHARACTER_SKINS[0];
+      setCurrentSkin(selected);
+    };
+    loadData();
     initSounds();
     return () => cleanup();
   }, []);
 
-  // Blinking animation for "TAP TO START"
+  // Blinking animation
   useEffect(() => {
     const blink = Animated.loop(
       Animated.sequence([
@@ -884,7 +1349,7 @@ export default function GameScreen() {
     return () => blink.stop();
   }, []);
 
-  const createEntities = () => ({
+  const createEntities = (selectedSkin = CHARACTER_SKINS[0]) => ({
     player: {
       x: GAME.PLAYER_X,
       y: SH / 2 - GAME.PLAYER_SIZE / 2,
@@ -892,10 +1357,12 @@ export default function GameScreen() {
       height: GAME.PLAYER_SIZE,
       velocity: 0,
       shieldTime: 0,
+      skin: selectedSkin,
       renderer: Player,
     },
     gameState: {
       score: 0,
+      coins: 0,
       speed: GAME.BASE_SPEED,
       frameCount: 0,
       spawnTimer: 0,
@@ -904,11 +1371,29 @@ export default function GameScreen() {
       slowMoTime: 0,
       clusterSpawnRemaining: 0,
       clusterGap: 0,
+      nearMissCount: 0,
       renderer: () => null,
     },
   });
 
-  const [entities, setEntities] = useState(createEntities);
+  const [entities, setEntities] = useState(() => createEntities(CHARACTER_SKINS[0]));
+
+  // Handle mystery box check after coin changes
+  const checkMysteryBoxes = async (newCoins) => {
+    const coinsSinceStart = newCoins - coinsAtStart;
+    const boxesEarned = Math.floor(coinsSinceStart / GAME.MYSTERY_BOX_COINS);
+    const currentBoxes = await getMysteryBoxes();
+    const boxesAtStart = Math.floor(coinsAtStart / GAME.MYSTERY_BOX_COINS);
+    const newBoxesEarned = boxesEarned - boxesAtStart;
+    
+    if (newBoxesEarned > currentBoxes) {
+      for (let i = 0; i < newBoxesEarned - currentBoxes; i++) {
+        await addMysteryBox();
+      }
+      const totalBoxes = await getMysteryBoxes();
+      setMysteryBoxes(totalBoxes);
+    }
+  };
 
   const onEvent = useCallback(async (e) => {
     if (e.type === 'game-over') {
@@ -918,10 +1403,32 @@ export default function GameScreen() {
       setSlowMoActive(false);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       playSound('crash');
+      
+      // Check for near highscore
+      const diff = highscore - score;
+      const threshold = Math.ceil(highscore * GAME.HIGHSCORE_THRESHOLD);
+      if (score < highscore && diff <= threshold && diff > 0) {
+        setNearHighscore(true);
+        setPointsFromHighscore(diff);
+      } else {
+        setNearHighscore(false);
+      }
+      
+      // Persist coins and check for mystery boxes
+      if (entities.gameState) {
+        const earnedCoins = Math.floor(entities.gameState.coins);
+        if (earnedCoins > 0) {
+          const newTotal = await addCoins(earnedCoins);
+          await checkMysteryBoxes(newTotal);
+          setCoins(newTotal);
+        }
+      }
+      
       const isNew = await checkHighscore(score);
       if (isNew) {
         setHighscoreState(score);
         setIsNewHighscore(true);
+        setNearHighscore(false);
       }
     } else if (e.type === 'score') {
       setScore(e.score);
@@ -942,17 +1449,24 @@ export default function GameScreen() {
     } else if (e.type === 'shield-break') {
       setShieldActive(false);
       playSound('shield-break');
+    } else if (e.type === 'coin-collect') {
+      playCoinSound();
+    } else if (e.type === 'near-miss') {
+      setShowNearMiss(true);
+      setTimeout(() => setShowNearMiss(false), 1000);
+      playNearMissSound();
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     }
-  }, [score]);
+  }, [score, highscore, entities.gameState, coinsAtStart]);
 
   const handleTap = () => {
     if (showMenu) {
-      // Start game
-      const newEntities = createEntities();
+      const newEntities = createEntities(currentSkin);
       setShowMenu(false);
       setScore(0);
       setGameOver(false);
       setIsNewHighscore(false);
+      setNearHighscore(false);
       setShieldActive(false);
       setSlowMoActive(false);
       setGameKey(k => k + 1);
@@ -962,11 +1476,11 @@ export default function GameScreen() {
     }
     
     if (gameOver) {
-      // Restart
-      const newEntities = createEntities();
+      const newEntities = createEntities(currentSkin);
       setScore(0);
       setGameOver(false);
       setIsNewHighscore(false);
+      setNearHighscore(false);
       setShieldActive(false);
       setSlowMoActive(false);
       setGameKey(k => k + 1);
@@ -975,10 +1489,8 @@ export default function GameScreen() {
       return;
     }
     
-    // Don't jump while paused
     if (paused) return;
     
-    // Jump
     if (entities.player) {
       entities.player.velocity = GAME.JUMP_FORCE;
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -986,21 +1498,66 @@ export default function GameScreen() {
     }
   };
 
-  // Update scroll offset for parallax + speed display + power-up states
+  // Update UI states
   useEffect(() => {
     if (running && entities.gameState) {
       const interval = setInterval(() => {
         setScrollOffset(entities.gameState.scrollOffset || 0);
         const spd = entities.gameState.speed || GAME.BASE_SPEED;
         setCurrentSpeed(Math.round((spd / GAME.BASE_SPEED) * 10) / 10);
-        
-        // Update power-up UI states
         setShieldActive(entities.gameState.shieldTime > 0);
         setSlowMoActive(entities.gameState.slowMoTime > 0);
       }, 50);
       return () => clearInterval(interval);
     }
   }, [running]);
+
+  // Handle skin selection
+  const handleSkinSelect = async (skinId) => {
+    const success = await setCurrentSkin(skinId);
+    if (success) {
+      const skinData = await getSkinData();
+      setSkins(skinData);
+      const selected = CHARACTER_SKINS.find(s => s.id === skinId);
+      setCurrentSkin(selected);
+    }
+  };
+
+  // Handle skin purchase
+  const handleSkinPurchase = async (skinId) => {
+    const result = await purchaseSkin(skinId);
+    if (result.success) {
+      setCoins(result.newTotal);
+      const skinData = await getSkinData();
+      setSkins(skinData);
+      playCoinSound();
+    }
+  };
+
+  // Handle mystery box open
+  const handleOpenBox = async () => {
+    if (mysteryBoxes <= 0) return;
+    
+    setBoxShaking(true);
+    playBoxOpenSound();
+    
+    setTimeout(async () => {
+      setBoxShaking(false);
+      const reward = await openMysteryBoxReward();
+      if (reward.success) {
+        setBoxReward(reward);
+        setShowBoxReward(true);
+        setMysteryBoxes(reward.remainingBoxes);
+        if (reward.type === 'coins') {
+          setCoins(reward.newTotal);
+        } else {
+          // Update skins after unlocking
+          const skinData = await getSkinData();
+          setSkins(skinData);
+        }
+      }
+    }, 1000);
+  };
 
   return (
     <TouchableWithoutFeedback onPress={handleTap}>
@@ -1022,6 +1579,14 @@ export default function GameScreen() {
         
         {/* SlowMo visual effect */}
         <SlowMoOverlay active={slowMoActive} />
+        
+        {/* Near Miss text */}
+        <NearMissText visible={showNearMiss} />
+        
+        {/* Coin Counter */}
+        {!showMenu && !gameOver && (
+          <CoinCounter coins={Math.floor((entities.gameState?.coins || 0))} />
+        )}
         
         {/* Score + Speed + Pause */}
         {!showMenu && !gameOver && (
@@ -1060,7 +1625,7 @@ export default function GameScreen() {
           </>
         )}
         
-        {/* Pause Overlay - catches its own taps to resume */}
+        {/* Pause Overlay */}
         {paused && (
           <TouchableWithoutFeedback onPress={() => { setPaused(false); setRunning(true); }}>
             <View style={styles.overlay}>
@@ -1080,9 +1645,43 @@ export default function GameScreen() {
             <Text style={styles.title}>GLITCH</Text>
             <Text style={styles.titleAccent}>JUMP</Text>
             <View style={styles.menuDivider} />
+            
+            {/* Coins display */}
+            <View style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              marginBottom: 10,
+            }}>
+              <Text style={{ fontSize: 24, marginRight: 6 }}>🪙</Text>
+              <Text style={{
+                color: GAME.COLORS.COIN,
+                fontSize: 24,
+                fontWeight: 'bold',
+                fontFamily: 'monospace',
+              }}>{coins}</Text>
+            </View>
+            
             <Text style={styles.menuHighscore}>BEST: {String(highscore).padStart(4, '0')}</Text>
+            
+            {/* Character Selector */}
+            <CharacterSelector
+              skins={skins}
+              onSelect={handleSkinSelect}
+              onPurchase={handleSkinPurchase}
+              coins={coins}
+            />
+            
+            {/* Mystery Box */}
+            {mysteryBoxes > 0 && (
+              <MysteryBoxRenderer
+                shaking={boxShaking}
+                onOpen={handleOpenBox}
+                count={mysteryBoxes}
+              />
+            )}
+            
             <View style={styles.instructions}>
-              <Text style={styles.instructionText}>★ Star: +5 points</Text>
+              <Text style={styles.instructionText}>★ Star: +{GAME.STAR_POINTS} pts +{GAME.STAR_COINS} coins</Text>
               <Text style={styles.instructionText}>🛡 Shield: protection</Text>
               <Text style={styles.instructionText}>⏱ SlowMo: slow time</Text>
             </View>
@@ -1096,8 +1695,35 @@ export default function GameScreen() {
             <Text style={styles.gameOverText}>GAME</Text>
             <Text style={styles.gameOverText}>OVER</Text>
             <View style={styles.menuDivider} />
+            
+            {/* Near highscore message */}
+            {nearHighscore && (
+              <Text style={{
+                color: GAME.COLORS.NEAR_MISS,
+                fontSize: 14,
+                fontFamily: 'monospace',
+                marginBottom: 10,
+                textAlign: 'center',
+              }}>
+                So close! Only {pointsFromHighscore} points from highscore
+              </Text>
+            )}
+            
             <Text style={styles.finalScore}>SCORE: {String(score).padStart(4, '0')}</Text>
             <Text style={styles.menuHighscore}>BEST: {String(highscore).padStart(4, '0')}</Text>
+            
+            {/* Coins earned this run */}
+            {entities.gameState && entities.gameState.coins > 0 && (
+              <Text style={{
+                color: GAME.COLORS.COIN,
+                fontSize: 14,
+                fontFamily: 'monospace',
+                marginTop: 8,
+              }}>
+                +{Math.floor(entities.gameState.coins)} coins earned!
+              </Text>
+            )}
+            
             {isNewHighscore && (
               <Text style={styles.newHighscore}>★ NEW RECORD ★</Text>
             )}
@@ -1105,6 +1731,13 @@ export default function GameScreen() {
             <Animated.Text style={[styles.tapToStart, { opacity: blinkAnim }]}>TAP TO RETRY</Animated.Text>
           </View>
         )}
+        
+        {/* Mystery Box Reward Modal */}
+        <MysteryBoxModal
+          visible={showBoxReward}
+          reward={boxReward}
+          onClose={() => setShowBoxReward(false)}
+        />
         
         {/* Game Engine */}
         <GameEngine
@@ -1246,20 +1879,20 @@ const styles = StyleSheet.create({
   },
   speedContainer: {
     position: 'absolute',
-    top: 50,
-    left: 20,
-    alignItems: 'flex-start',
+    top: 100,
+    right: 20,
+    alignItems: 'flex-end',
     zIndex: 50,
   },
   speedLabel: {
     color: GAME.COLORS.TEXT_DIM,
-    fontSize: 12,
+    fontSize: 10,
     fontFamily: 'monospace',
-    letterSpacing: 3,
+    letterSpacing: 2,
   },
   speedValue: {
     color: GAME.COLORS.ACCENT,
-    fontSize: 20,
+    fontSize: 16,
     fontWeight: 'bold',
     fontFamily: 'monospace',
   },
@@ -1312,7 +1945,7 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
   },
   instructions: {
-    marginTop: 20,
+    marginTop: 10,
     alignItems: 'center',
   },
   instructionText: {
