@@ -285,20 +285,7 @@ const StarRenderer = (props) => {
       width: size * scale,
       height: size * scale,
       transform: [{ scale }],
-      alignItems: 'center',
     }}>
-      {/* +10 Label above */}
-      <Text style={{
-        position: 'absolute',
-        top: -16,
-        color: GAME.COLORS.STAR,
-        fontSize: 12,
-        fontWeight: 'bold',
-        fontFamily: 'monospace',
-        textShadowColor: GAME.COLORS.STAR,
-        textShadowOffset: { width: 0, height: 0 },
-        textShadowRadius: 4,
-      }}>+10</Text>
       {/* Glow */}
       <View style={{
         position: 'absolute', left: -8, top: -8,
@@ -628,7 +615,7 @@ const SpawnSystem = (entities, { time, dispatch }) => {
     }
     
     // Random chance to spawn power-up (not during cluster)
-    if (!state.clusterSpawnRemaining && Math.random() < 0.25) {
+    if (!state.clusterSpawnRemaining && Math.random() < 0.40) {
       spawnPowerUp(entities, state);
     }
   }
@@ -643,11 +630,11 @@ const spawnObstacle = (entities, state) => {
   const speedFactor = Math.min(1, (state.speed - GAME.BASE_SPEED) / (GAME.MAX_SPEED - GAME.BASE_SPEED));
   
   // Weights shift as speed increases:
-  // Floor: 30% → 15%, Ceiling: 25% → 15%, Mid: 20% → 35%, Moving: 13% → 20%, Slalom: 12% → 15%
-  const floorWeight = 0.30 - (speedFactor * 0.15);      // 30% → 15%
-  const ceilingWeight = 0.25 - (speedFactor * 0.10);    // 25% → 15%
-  const midWeight = 0.20 + (speedFactor * 0.15);        // 20% → 35%
-  const movingWeight = 0.13 + (speedFactor * 0.07);     // 13% → 20%
+  // Floor: 20% → 10%, Ceiling: 15% → 10%, Mid: 35% → 45%, Moving: 18% → 22%, Slalom: 12% → 13%
+  const floorWeight = 0.20 - (speedFactor * 0.10);      // 20% → 10%
+  const ceilingWeight = 0.15 - (speedFactor * 0.05);    // 15% → 10%
+  const midWeight = 0.35 + (speedFactor * 0.10);        // 35% → 45%
+  const movingWeight = 0.18 + (speedFactor * 0.04);     // 18% → 22%
   // Slalom gets remainder
   
   const type = Math.random();
