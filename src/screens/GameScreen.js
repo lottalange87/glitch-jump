@@ -15,6 +15,9 @@ const { width: SW, height: SH } = Dimensions.get('window');
 // Pixel-art style player with face
 const Player = (props) => {
   const s = props.width || GAME.PLAYER_SIZE;
+  const hasShield = props.shieldTime > 0;
+  const shieldOpacity = hasShield ? Math.min(1, props.shieldTime / 500) : 0;
+  
   return (
     <View style={{
       position: 'absolute',
@@ -23,19 +26,38 @@ const Player = (props) => {
       width: s,
       height: s,
     }}>
+      {/* Shield aura effect */}
+      {hasShield && (
+        <>
+          <View style={{
+            position: 'absolute', left: -10, top: -10,
+            width: s + 20, height: s + 20,
+            backgroundColor: `rgba(0, 204, 255, ${0.3 * shieldOpacity})`,
+            borderRadius: (s + 20) / 2,
+            borderWidth: 2,
+            borderColor: `rgba(0, 204, 255, ${0.8 * shieldOpacity})`,
+          }} />
+          <View style={{
+            position: 'absolute', left: -6, top: -6,
+            width: s + 12, height: s + 12,
+            backgroundColor: `rgba(0, 204, 255, ${0.2 * shieldOpacity})`,
+            borderRadius: (s + 12) / 2,
+          }} />
+        </>
+      )}
       {/* Glow effect */}
       <View style={{
         position: 'absolute', left: -4, top: -4,
         width: s + 8, height: s + 8,
-        backgroundColor: 'rgba(0,255,136,0.15)',
+        backgroundColor: hasShield ? 'rgba(0,204,255,0.25)' : 'rgba(0,255,136,0.15)',
         borderRadius: 4,
       }} />
       {/* Body */}
       <View style={{
         width: s, height: s,
-        backgroundColor: GAME.COLORS.PLAYER,
+        backgroundColor: hasShield ? GAME.COLORS.PLAYER : GAME.COLORS.PLAYER,
         borderWidth: 2,
-        borderColor: GAME.COLORS.PLAYER_GLOW,
+        borderColor: hasShield ? GAME.COLORS.PLAYER_SHIELD : GAME.COLORS.PLAYER_GLOW,
         borderRadius: 3,
       }}>
         {/* Eyes */}
@@ -92,6 +114,278 @@ const ObstacleRenderer = (props) => {
             marginHorizontal: 3,
           }} />
         ))}
+      </View>
+    </View>
+  );
+};
+
+// Moving Block - obstacle that moves up and down
+const MovingBlockRenderer = (props) => {
+  const w = props.width || GAME.OBSTACLE_WIDTH;
+  const h = props.height || 60;
+  
+  return (
+    <View style={{
+      position: 'absolute',
+      left: props.x,
+      top: props.y,
+      width: w,
+      height: h,
+    }}>
+      {/* Glow - more intense for moving block */}
+      <View style={{
+        position: 'absolute', left: -4, top: -4,
+        width: w + 8, height: h + 8,
+        backgroundColor: 'rgba(255,100,100,0.4)',
+        borderRadius: 2,
+      }} />
+      {/* Body */}
+      <View style={{
+        width: w, height: h,
+        backgroundColor: '#ff4466',
+        borderWidth: 2,
+        borderColor: '#ff6688',
+        borderRadius: 2,
+      }}>
+        {/* Arrow indicators */}
+        <View style={{
+          position: 'absolute',
+          top: 4,
+          left: '50%',
+          marginLeft: -4,
+          width: 0,
+          height: 0,
+          borderLeftWidth: 4,
+          borderRightWidth: 4,
+          borderBottomWidth: 6,
+          borderLeftColor: 'transparent',
+          borderRightColor: 'transparent',
+          borderBottomColor: 'rgba(255,255,255,0.6)',
+        }} />
+        <View style={{
+          position: 'absolute',
+          bottom: 4,
+          left: '50%',
+          marginLeft: -4,
+          width: 0,
+          height: 0,
+          borderLeftWidth: 4,
+          borderRightWidth: 4,
+          borderTopWidth: 6,
+          borderLeftColor: 'transparent',
+          borderRightColor: 'transparent',
+          borderTopColor: 'rgba(255,255,255,0.6)',
+        }} />
+        {/* Center stripe */}
+        <View style={{
+          position: 'absolute',
+          top: '30%',
+          left: 2,
+          right: 2,
+          height: 2,
+          backgroundColor: 'rgba(0,0,0,0.3)',
+        }} />
+        <View style={{
+          position: 'absolute',
+          top: '70%',
+          left: 2,
+          right: 2,
+          height: 2,
+          backgroundColor: 'rgba(0,0,0,0.3)',
+        }} />
+      </View>
+    </View>
+  );
+};
+
+// Slalom Gate - two gaps side by side
+const SlalomGateRenderer = (props) => {
+  const w = GAME.OBSTACLE_WIDTH;
+  const totalWidth = props.totalWidth || 120;
+  const gapY = props.gapY || 100;
+  const gateHeight = props.gateHeight || 150;
+  
+  return (
+    <View style={{
+      position: 'absolute',
+      left: props.x,
+      top: gapY,
+      width: totalWidth,
+      height: gateHeight,
+    }}>
+      {/* Top bar */}
+      <View style={{
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        height: 20,
+        backgroundColor: GAME.COLORS.OBSTACLE,
+        borderWidth: 2,
+        borderColor: GAME.COLORS.OBSTACLE_DARK,
+      }}>
+        {/* Direction indicator */}
+        <Text style={{
+          color: 'rgba(255,255,255,0.8)',
+          fontSize: 10,
+          textAlign: 'center',
+          lineHeight: 16,
+          fontFamily: 'monospace',
+        }}>⬆</Text>
+      </View>
+      
+      {/* Left pillar */}
+      <View style={{
+        position: 'absolute',
+        left: 0,
+        top: 20,
+        width: w,
+        height: gateHeight - 20,
+        backgroundColor: GAME.COLORS.OBSTACLE,
+        borderWidth: 2,
+        borderColor: GAME.COLORS.OBSTACLE_DARK,
+      }} />
+      
+      {/* Right pillar */}
+      <View style={{
+        position: 'absolute',
+        right: 0,
+        top: 20,
+        width: w,
+        height: gateHeight - 20,
+        backgroundColor: GAME.COLORS.OBSTACLE,
+        borderWidth: 2,
+        borderColor: GAME.COLORS.OBSTACLE_DARK,
+      }} />
+      
+      {/* Center gap indicator */}
+      <View style={{
+        position: 'absolute',
+        left: w + 10,
+        right: w + 10,
+        top: 30,
+        height: 2,
+        backgroundColor: 'rgba(0,255,136,0.3)',
+      }} />
+    </View>
+  );
+};
+
+// Star Power-up Renderer
+const StarRenderer = (props) => {
+  const size = 24;
+  const pulse = props.pulse || 0;
+  const scale = 1 + Math.sin(pulse) * 0.15;
+  
+  return (
+    <View style={{
+      position: 'absolute',
+      left: props.x - (size * scale - size) / 2,
+      top: props.y - (size * scale - size) / 2,
+      width: size * scale,
+      height: size * scale,
+      transform: [{ scale }],
+    }}>
+      {/* Glow */}
+      <View style={{
+        position: 'absolute', left: -8, top: -8,
+        width: size + 16, height: size + 16,
+        backgroundColor: GAME.COLORS.STAR_GLOW,
+        borderRadius: (size + 16) / 2,
+      }} />
+      {/* Star body */}
+      <View style={{
+        width: size, height: size,
+        justifyContent: 'center',
+        alignItems: 'center',
+      }}>
+        <Text style={{
+          fontSize: 20,
+          color: GAME.COLORS.STAR,
+          textShadowColor: GAME.COLORS.STAR,
+          textShadowOffset: { width: 0, height: 0 },
+          textShadowRadius: 8,
+        }}>★</Text>
+      </View>
+    </View>
+  );
+};
+
+// Shield Power-up Renderer
+const ShieldRenderer = (props) => {
+  const size = 26;
+  const pulse = props.pulse || 0;
+  const scale = 1 + Math.sin(pulse + 1) * 0.1;
+  
+  return (
+    <View style={{
+      position: 'absolute',
+      left: props.x - (size * scale - size) / 2,
+      top: props.y - (size * scale - size) / 2,
+      width: size * scale,
+      height: size * scale,
+      transform: [{ scale }],
+    }}>
+      {/* Glow */}
+      <View style={{
+        position: 'absolute', left: -8, top: -8,
+        width: size + 16, height: size + 16,
+        backgroundColor: 'rgba(0, 204, 255, 0.4)',
+        borderRadius: (size + 16) / 2,
+      }} />
+      {/* Shield body */}
+      <View style={{
+        width: size, height: size,
+        justifyContent: 'center',
+        alignItems: 'center',
+      }}>
+        <Text style={{
+          fontSize: 18,
+          color: GAME.COLORS.SHIELD,
+          textShadowColor: GAME.COLORS.SHIELD,
+          textShadowOffset: { width: 0, height: 0 },
+          textShadowRadius: 8,
+        }}>🛡</Text>
+      </View>
+    </View>
+  );
+};
+
+// SlowMo Power-up Renderer
+const SlowMoRenderer = (props) => {
+  const size = 26;
+  const pulse = props.pulse || 0;
+  const rotate = (pulse * 30) % 360;
+  
+  return (
+    <View style={{
+      position: 'absolute',
+      left: props.x,
+      top: props.y,
+      width: size,
+      height: size,
+    }}>
+      {/* Glow */}
+      <View style={{
+        position: 'absolute', left: -6, top: -6,
+        width: size + 12, height: size + 12,
+        backgroundColor: 'rgba(170, 102, 255, 0.4)',
+        borderRadius: (size + 12) / 2,
+      }} />
+      {/* SlowMo body */}
+      <View style={{
+        width: size, height: size,
+        justifyContent: 'center',
+        alignItems: 'center',
+        transform: [{ rotate: `${rotate}deg` }],
+      }}>
+        <Text style={{
+          fontSize: 18,
+          color: GAME.COLORS.SLOWMO,
+          textShadowColor: GAME.COLORS.SLOWMO,
+          textShadowOffset: { width: 0, height: 0 },
+          textShadowRadius: 8,
+        }}>⏱</Text>
       </View>
     </View>
   );
@@ -174,6 +468,27 @@ const Scanlines = () => (
   </View>
 );
 
+// SlowMo visual effect overlay
+const SlowMoOverlay = ({ active }) => {
+  if (!active) return null;
+  
+  return (
+    <View style={[StyleSheet.absoluteFill, {
+      zIndex: 90,
+      backgroundColor: 'rgba(170, 102, 255, 0.15)',
+      pointerEvents: 'none',
+    }]}>
+      {/* Ripple effect */}
+      <View style={{
+        position: 'absolute',
+        top: 0, left: 0, right: 0, bottom: 0,
+        borderWidth: 4,
+        borderColor: 'rgba(170, 102, 255, 0.3)',
+      }} />
+    </View>
+  );
+};
+
 // ============================================
 // GAME SYSTEMS
 // ============================================
@@ -184,13 +499,31 @@ const Physics = (entities, { time, dispatch }) => {
   
   if (!player || !state) return entities;
   
-  // Increase speed over time
-  state.speed = Math.min(GAME.MAX_SPEED, GAME.BASE_SPEED + state.frameCount * GAME.SPEED_INCREMENT);
-  state.frameCount++;
-  state.scrollOffset += state.speed;
+  // Apply slow-mo factor
+  const timeScale = state.slowMoTime > 0 ? GAME.SLOWMO_FACTOR : 1;
   
-  // Gravity
-  player.velocity = Math.min(player.velocity + GAME.GRAVITY, GAME.MAX_FALL_SPEED);
+  // Increase speed over time (slower during slow-mo)
+  const speedIncrement = GAME.SPEED_INCREMENT * timeScale;
+  state.speed = Math.min(GAME.MAX_SPEED, GAME.BASE_SPEED + state.frameCount * speedIncrement);
+  state.frameCount++;
+  state.scrollOffset += state.speed * timeScale;
+  
+  // Update power-up timers
+  if (state.shieldTime > 0) {
+    state.shieldTime -= 16 * timeScale;
+    if (state.shieldTime < 0) state.shieldTime = 0;
+  }
+  if (state.slowMoTime > 0) {
+    state.slowMoTime -= 16 * timeScale;
+    if (state.slowMoTime < 0) state.slowMoTime = 0;
+  }
+  
+  // Update player shield display
+  player.shieldTime = state.shieldTime;
+  
+  // Gravity (affected by slow-mo)
+  const gravity = GAME.GRAVITY * timeScale;
+  player.velocity = Math.min(player.velocity + gravity, GAME.MAX_FALL_SPEED * timeScale);
   player.y += player.velocity;
   
   // Floor collision
@@ -209,17 +542,39 @@ const Physics = (entities, { time, dispatch }) => {
   Object.keys(entities).forEach(key => {
     if (key.startsWith('obs_')) {
       const obs = entities[key];
-      obs.x -= state.speed;
+      obs.x -= state.speed * timeScale;
       
-      // Score when passing obstacle
-      if (!obs.scored && obs.x + obs.width < player.x) {
+      // Update moving blocks
+      if (obs.type === 'moving') {
+        obs.moveTimer = (obs.moveTimer || 0) + 16 * timeScale;
+        const moveCycle = 2000; // 2 second cycle
+        const moveProgress = (obs.moveTimer % moveCycle) / moveCycle;
+        const moveRange = obs.moveRange || 80;
+        const baseY = obs.baseY || obs.y;
+        obs.y = baseY + Math.sin(moveProgress * Math.PI * 2) * (moveRange / 2);
+      }
+      
+      // Score when passing obstacle (only count main obstacles, not slalom parts)
+      if (!obs.scored && obs.x + (obs.totalWidth || obs.width) < player.x && obs.givesScore !== false) {
         obs.scored = true;
         state.score++;
         dispatch({ type: 'score', score: state.score });
       }
       
       // Remove off-screen
-      if (obs.x < -60) {
+      if (obs.x < -200) {
+        delete entities[key];
+      }
+    }
+    
+    // Move and animate power-ups
+    if (key.startsWith('powerup_')) {
+      const powerup = entities[key];
+      powerup.x -= state.speed * timeScale;
+      powerup.pulse = (powerup.pulse || 0) + 0.1 * timeScale;
+      
+      // Remove off-screen
+      if (powerup.x < -50) {
         delete entities[key];
       }
     }
@@ -228,70 +583,229 @@ const Physics = (entities, { time, dispatch }) => {
   return entities;
 };
 
-const SpawnSystem = (entities, { time }) => {
+const SpawnSystem = (entities, { time, dispatch }) => {
   const state = entities.gameState;
   if (!state) return entities;
   
-  state.spawnTimer += 16;
+  const timeScale = state.slowMoTime > 0 ? GAME.SLOWMO_FACTOR : 1;
+  state.spawnTimer += 16 * timeScale;
   
-  // Dynamic spawn rate based on speed
-  const spawnInterval = Math.max(GAME.MIN_SPAWN_MS, GAME.MAX_SPAWN_MS - state.frameCount * 0.5);
+  // Dynamic spawn rate based on speed - more aggressive at higher speeds
+  const speedFactor = (state.speed - GAME.BASE_SPEED) / (GAME.MAX_SPEED - GAME.BASE_SPEED);
+  const baseInterval = GAME.MAX_SPAWN_MS - (speedFactor * 800); // Spawn faster as speed increases
+  const spawnInterval = Math.max(GAME.MIN_SPAWN_MS, baseInterval);
   
   if (state.spawnTimer >= spawnInterval) {
     state.spawnTimer = 0;
-    const id = `obs_${Date.now()}_${Math.random()}`;
     
-    // Random obstacle type
-    const type = Math.random();
-    let obsY, obsH;
-    
-    if (type < 0.4) {
-      // Floor spike
-      obsH = GAME.MIN_OBSTACLE_HEIGHT + Math.random() * (GAME.MAX_OBSTACLE_HEIGHT - GAME.MIN_OBSTACLE_HEIGHT);
-      obsY = GAME.FLOOR_Y - obsH;
-    } else if (type < 0.7) {
-      // Ceiling spike
-      obsH = GAME.MIN_OBSTACLE_HEIGHT + Math.random() * 60;
-      obsY = 0;
-    } else {
-      // Mid-air block
-      obsH = 30 + Math.random() * 40;
-      obsY = 100 + Math.random() * (GAME.FLOOR_Y - 200);
+    // Check for cluster spawn (2-3 obstacles in quick succession)
+    const clusterChance = Math.min(0.35, 0.15 + speedFactor * 0.2); // Increases with speed
+    if (Math.random() < clusterChance && !state.clusterSpawnRemaining) {
+      state.clusterSpawnRemaining = Math.floor(Math.random() * 2) + 2; // 2-3 obstacles
+      state.clusterGap = 400 + Math.random() * 300; // Gap between cluster obstacles
     }
     
-    entities[id] = {
-      x: SW + 20,
-      y: obsY,
-      width: GAME.OBSTACLE_WIDTH,
-      height: obsH,
-      isTop: type >= 0.4 && type < 0.7,
-      scored: false,
-      renderer: ObstacleRenderer,
-    };
+    // Spawn obstacle
+    spawnObstacle(entities, state);
+    
+    // Handle cluster spawning
+    if (state.clusterSpawnRemaining > 0) {
+      state.clusterSpawnRemaining--;
+      state.spawnTimer = spawnInterval - state.clusterGap;
+    }
+    
+    // Random chance to spawn power-up (not during cluster)
+    if (!state.clusterSpawnRemaining && Math.random() < 0.25) {
+      spawnPowerUp(entities, state);
+    }
   }
   
   return entities;
 };
 
+const spawnObstacle = (entities, state) => {
+  const id = `obs_${Date.now()}_${Math.random()}`;
+  
+  // Random obstacle type with weights
+  const type = Math.random();
+  let obsY, obsH, obstacleType = 'normal', totalWidth, gapY;
+  
+  if (type < 0.3) {
+    // Floor spike
+    obsH = GAME.MIN_OBSTACLE_HEIGHT + Math.random() * (GAME.MAX_OBSTACLE_HEIGHT - GAME.MIN_OBSTACLE_HEIGHT);
+    obsY = GAME.FLOOR_Y - obsH;
+  } else if (type < 0.55) {
+    // Ceiling spike
+    obsH = GAME.MIN_OBSTACLE_HEIGHT + Math.random() * 60;
+    obsY = 0;
+    obstacleType = 'ceiling';
+  } else if (type < 0.75) {
+    // Mid-air block
+    obsH = 30 + Math.random() * 40;
+    obsY = 100 + Math.random() * (GAME.FLOOR_Y - 200);
+    obstacleType = 'mid';
+  } else if (type < 0.88) {
+    // Moving block
+    obsH = 40 + Math.random() * 30;
+    obsY = 120 + Math.random() * (GAME.FLOOR_Y - 250);
+    obstacleType = 'moving';
+  } else {
+    // Slalom gate
+    obstacleType = 'slalom';
+    totalWidth = 100 + Math.random() * 60;
+    gapY = 60 + Math.random() * (GAME.FLOOR_Y - 200);
+    obsH = 120;
+  }
+  
+  if (obstacleType === 'slalom') {
+    entities[id] = {
+      x: SW + 20,
+      y: gapY,
+      totalWidth: totalWidth,
+      height: obsH,
+      gapY: gapY,
+      gateHeight: obsH,
+      type: obstacleType,
+      scored: false,
+      givesScore: true,
+      renderer: SlalomGateRenderer,
+    };
+  } else if (obstacleType === 'moving') {
+    entities[id] = {
+      x: SW + 20,
+      y: obsY,
+      baseY: obsY,
+      width: GAME.OBSTACLE_WIDTH,
+      height: obsH,
+      type: obstacleType,
+      moveTimer: 0,
+      moveRange: 60 + Math.random() * 60,
+      scored: false,
+      renderer: MovingBlockRenderer,
+    };
+  } else {
+    entities[id] = {
+      x: SW + 20,
+      y: obsY,
+      width: GAME.OBSTACLE_WIDTH,
+      height: obsH,
+      isTop: obstacleType === 'ceiling',
+      type: obstacleType,
+      scored: false,
+      renderer: ObstacleRenderer,
+    };
+  }
+};
+
+const spawnPowerUp = (entities, state) => {
+  const id = `powerup_${Date.now()}_${Math.random()}`;
+  
+  // Random power-up type
+  const powerUpType = Math.random();
+  let type, renderer, yPos;
+  
+  if (powerUpType < 0.4) {
+    type = 'star';
+    renderer = StarRenderer;
+  } else if (powerUpType < 0.7) {
+    type = 'shield';
+    renderer = ShieldRenderer;
+  } else {
+    type = 'slowmo';
+    renderer = SlowMoRenderer;
+  }
+  
+  // Position power-up at a reachable height
+  yPos = 80 + Math.random() * (GAME.FLOOR_Y - 160);
+  
+  entities[id] = {
+    x: SW + 20,
+    y: yPos,
+    width: 24,
+    height: 24,
+    type: type,
+    pulse: 0,
+    renderer: renderer,
+  };
+};
+
 const CollisionSystem = (entities, { dispatch }) => {
   const player = entities.player;
-  if (!player) return entities;
+  const state = entities.gameState;
+  if (!player || !state) return entities;
   
   const px = player.x, py = player.y;
   const pw = player.width, ph = player.height;
   // Slightly smaller hitbox for fairness
   const margin = 4;
   
+  // Check obstacle collisions
   Object.keys(entities).forEach(key => {
     if (key.startsWith('obs_')) {
       const obs = entities[key];
-      if (
-        px + margin < obs.x + obs.width &&
-        px + pw - margin > obs.x &&
-        py + margin < obs.y + obs.height &&
-        py + ph - margin > obs.y
-      ) {
-        dispatch({ type: 'game-over' });
+      let collision = false;
+      
+      if (obs.type === 'slalom') {
+        // Slalom gate collision - check left and right pillars
+        const w = GAME.OBSTACLE_WIDTH;
+        const gapWidth = obs.totalWidth - w * 2;
+        
+        // Left pillar
+        if (px + margin < obs.x + w && px + pw - margin > obs.x &&
+            py + margin < obs.y + obs.gateHeight && py + ph - margin > obs.y + 20) {
+          collision = true;
+        }
+        // Right pillar
+        if (px + margin < obs.x + obs.totalWidth && px + pw - margin > obs.x + obs.totalWidth - w &&
+            py + margin < obs.y + obs.gateHeight && py + ph - margin > obs.y + 20) {
+          collision = true;
+        }
+        // Top bar
+        if (px + margin < obs.x + obs.totalWidth && px + pw - margin > obs.x &&
+            py + margin < obs.y + 20 && py + ph - margin > obs.y) {
+          collision = true;
+        }
+      } else {
+        // Standard obstacle collision
+        if (px + margin < obs.x + obs.width && px + pw - margin > obs.x &&
+            py + margin < obs.y + obs.height && py + ph - margin > obs.y) {
+          collision = true;
+        }
+      }
+      
+      if (collision) {
+        if (state.shieldTime > 0) {
+          // Shield protects - destroy obstacle and continue
+          state.shieldTime = 0;
+          delete entities[key];
+          dispatch({ type: 'shield-break' });
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+        } else {
+          dispatch({ type: 'game-over' });
+        }
+      }
+    }
+    
+    // Check power-up collection
+    if (key.startsWith('powerup_')) {
+      const powerup = entities[key];
+      if (px < powerup.x + powerup.width && px + pw > powerup.x &&
+          py < powerup.y + powerup.height && py + ph > powerup.y) {
+        
+        // Collect power-up
+        dispatch({ type: 'powerup-collect', powerupType: powerup.type });
+        
+        // Apply effect
+        if (powerup.type === 'star') {
+          state.score += GAME.STAR_POINTS;
+          dispatch({ type: 'score', score: state.score });
+        } else if (powerup.type === 'shield') {
+          state.shieldTime = GAME.SHIELD_DURATION;
+        } else if (powerup.type === 'slowmo') {
+          state.slowMoTime = GAME.SLOWMO_DURATION;
+        }
+        
+        delete entities[key];
       }
     }
   });
@@ -314,6 +828,8 @@ export default function GameScreen() {
   const [paused, setPaused] = useState(false);
   const [gameKey, setGameKey] = useState(0);
   const [currentSpeed, setCurrentSpeed] = useState(1);
+  const [shieldActive, setShieldActive] = useState(false);
+  const [slowMoActive, setSlowMoActive] = useState(false);
   const blinkAnim = useRef(new Animated.Value(1)).current;
   const engineRef = useRef(null);
 
@@ -353,6 +869,7 @@ export default function GameScreen() {
       width: GAME.PLAYER_SIZE,
       height: GAME.PLAYER_SIZE,
       velocity: 0,
+      shieldTime: 0,
       renderer: Player,
     },
     gameState: {
@@ -361,6 +878,10 @@ export default function GameScreen() {
       frameCount: 0,
       spawnTimer: 0,
       scrollOffset: 0,
+      shieldTime: 0,
+      slowMoTime: 0,
+      clusterSpawnRemaining: 0,
+      clusterGap: 0,
       renderer: () => null,
     },
   });
@@ -371,6 +892,8 @@ export default function GameScreen() {
     if (e.type === 'game-over') {
       setRunning(false);
       setGameOver(true);
+      setShieldActive(false);
+      setSlowMoActive(false);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       playSound('crash');
       const isNew = await checkHighscore(score);
@@ -386,6 +909,17 @@ export default function GameScreen() {
       } else {
         playSound('score');
       }
+    } else if (e.type === 'powerup-collect') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      playSound('powerup');
+      if (e.powerupType === 'shield') {
+        setShieldActive(true);
+      } else if (e.powerupType === 'slowmo') {
+        setSlowMoActive(true);
+      }
+    } else if (e.type === 'shield-break') {
+      setShieldActive(false);
+      playSound('shield-break');
     }
   }, [score]);
 
@@ -397,6 +931,8 @@ export default function GameScreen() {
       setScore(0);
       setGameOver(false);
       setIsNewHighscore(false);
+      setShieldActive(false);
+      setSlowMoActive(false);
       setGameKey(k => k + 1);
       setEntities(newEntities);
       setTimeout(() => setRunning(true), 50);
@@ -409,6 +945,8 @@ export default function GameScreen() {
       setScore(0);
       setGameOver(false);
       setIsNewHighscore(false);
+      setShieldActive(false);
+      setSlowMoActive(false);
       setGameKey(k => k + 1);
       setEntities(newEntities);
       setTimeout(() => setRunning(true), 50);
@@ -426,13 +964,17 @@ export default function GameScreen() {
     }
   };
 
-  // Update scroll offset for parallax + speed display
+  // Update scroll offset for parallax + speed display + power-up states
   useEffect(() => {
     if (running && entities.gameState) {
       const interval = setInterval(() => {
         setScrollOffset(entities.gameState.scrollOffset || 0);
         const spd = entities.gameState.speed || GAME.BASE_SPEED;
         setCurrentSpeed(Math.round((spd / GAME.BASE_SPEED) * 10) / 10);
+        
+        // Update power-up UI states
+        setShieldActive(entities.gameState.shieldTime > 0);
+        setSlowMoActive(entities.gameState.slowMoTime > 0);
       }, 50);
       return () => clearInterval(interval);
     }
@@ -456,6 +998,9 @@ export default function GameScreen() {
         {/* Ground */}
         <Ground />
         
+        {/* SlowMo visual effect */}
+        <SlowMoOverlay active={slowMoActive} />
+        
         {/* Score + Speed + Pause */}
         {!showMenu && !gameOver && (
           <>
@@ -465,10 +1010,26 @@ export default function GameScreen() {
             </View>
             <View style={styles.speedContainer}>
               <Text style={styles.speedLabel}>SPEED</Text>
-              <Text style={[styles.speedValue, currentSpeed >= 1.8 && { color: GAME.COLORS.OBSTACLE }]}>
+              <Text style={[styles.speedValue, currentSpeed >= 1.8 && { color: GAME.COLORS.OBSTACLE }]}
+              >
                 {currentSpeed}x
               </Text>
             </View>
+            
+            {/* Shield indicator */}
+            {shieldActive && (
+              <View style={styles.shieldIndicator}>
+                <Text style={styles.shieldIcon}>🛡</Text>
+              </View>
+            )}
+            
+            {/* SlowMo indicator */}
+            {slowMoActive && (
+              <View style={styles.slowMoIndicator}>
+                <Text style={styles.slowMoIcon}>⏱</Text>
+              </View>
+            )}
+            
             <TouchableWithoutFeedback onPress={togglePause}>
               <View style={styles.pauseButton}>
                 <Text style={styles.pauseIcon}>{paused ? '▶' : '⏸'}</Text>
@@ -484,6 +1045,8 @@ export default function GameScreen() {
               <Text style={styles.pauseTitle}>PAUSED</Text>
               <View style={styles.menuDivider} />
               <Text style={styles.finalScore}>SCORE: {String(score).padStart(4, '0')}</Text>
+              {shieldActive && <Text style={styles.powerupStatus}>🛡 SHIELD ACTIVE</Text>}
+              {slowMoActive && <Text style={styles.powerupStatus}>⏱ SLOW-MO ACTIVE</Text>}
               <Animated.Text style={[styles.tapToStart, { opacity: blinkAnim }]}>TAP TO RESUME</Animated.Text>
             </View>
           </TouchableWithoutFeedback>
@@ -496,6 +1059,11 @@ export default function GameScreen() {
             <Text style={styles.titleAccent}>JUMP</Text>
             <View style={styles.menuDivider} />
             <Text style={styles.menuHighscore}>BEST: {String(highscore).padStart(4, '0')}</Text>
+            <View style={styles.instructions}>
+              <Text style={styles.instructionText}>★ Star: +5 points</Text>
+              <Text style={styles.instructionText}>🛡 Shield: protection</Text>
+              <Text style={styles.instructionText}>⏱ SlowMo: slow time</Text>
+            </View>
             <Animated.Text style={[styles.tapToStart, { opacity: blinkAnim }]}>TAP TO START</Animated.Text>
           </View>
         )}
@@ -689,5 +1257,47 @@ const styles = StyleSheet.create({
     textShadowColor: GAME.COLORS.ACCENT,
     textShadowOffset: { width: 0, height: 0 },
     textShadowRadius: 10,
+  },
+  shieldIndicator: {
+    position: 'absolute',
+    top: 90,
+    left: 20,
+    zIndex: 50,
+    backgroundColor: 'rgba(0, 204, 255, 0.2)',
+    borderRadius: 12,
+    padding: 4,
+  },
+  shieldIcon: {
+    fontSize: 20,
+  },
+  slowMoIndicator: {
+    position: 'absolute',
+    top: 90,
+    left: 55,
+    zIndex: 50,
+    backgroundColor: 'rgba(170, 102, 255, 0.2)',
+    borderRadius: 12,
+    padding: 4,
+  },
+  slowMoIcon: {
+    fontSize: 20,
+  },
+  powerupStatus: {
+    color: GAME.COLORS.ACCENT,
+    fontSize: 14,
+    fontFamily: 'monospace',
+    marginTop: 8,
+    letterSpacing: 1,
+  },
+  instructions: {
+    marginTop: 20,
+    alignItems: 'center',
+  },
+  instructionText: {
+    color: GAME.COLORS.TEXT_DIM,
+    fontSize: 12,
+    fontFamily: 'monospace',
+    marginVertical: 2,
+    letterSpacing: 1,
   },
 });

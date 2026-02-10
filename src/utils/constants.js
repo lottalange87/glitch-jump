@@ -32,6 +32,12 @@ export const GAME = {
   MAX_OBSTACLE_HEIGHT: 120,
   GAP_MIN: 140,
   
+  // Power-ups
+  STAR_POINTS: 5,
+  SHIELD_DURATION: 3000, // ms
+  SLOWMO_DURATION: 2500, // ms
+  SLOWMO_FACTOR: 0.5, // 50% speed
+  
   // Scoring
   POINTS_PER_OBSTACLE: 1,
   
@@ -44,14 +50,18 @@ export const GAME = {
     PLAYER: '#00ff88',
     PLAYER_GLOW: '#00cc66',
     PLAYER_EYE: '#ffffff',
+    PLAYER_SHIELD: '#00ccff',
     OBSTACLE: '#ff2266',
     OBSTACLE_DARK: '#cc1144',
     OBSTACLE_GLOW: 'rgba(255,34,102,0.3)',
+    STAR: '#ffcc00',
+    STAR_GLOW: 'rgba(255,204,0,0.6)',
+    SHIELD: '#00ccff',
+    SLOWMO: '#aa66ff',
     SCORE: '#00ff88',
     TEXT: '#fffffe',
     TEXT_DIM: '#a7a9be',
     ACCENT: '#ff8906',
-    STAR: '#ffffff',
     SCANLINE: 'rgba(0,0,0,0.15)',
   },
 };
