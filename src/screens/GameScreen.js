@@ -415,6 +415,9 @@ export default function GameScreen() {
       return;
     }
     
+    // Don't jump while paused
+    if (paused) return;
+    
     // Jump
     if (entities.player) {
       entities.player.velocity = GAME.JUMP_FORCE;
@@ -474,14 +477,16 @@ export default function GameScreen() {
           </>
         )}
         
-        {/* Pause Overlay */}
+        {/* Pause Overlay - catches its own taps to resume */}
         {paused && (
-          <View style={styles.overlay}>
-            <Text style={styles.pauseTitle}>PAUSED</Text>
-            <View style={styles.menuDivider} />
-            <Text style={styles.finalScore}>SCORE: {String(score).padStart(4, '0')}</Text>
-            <Animated.Text style={[styles.tapToStart, { opacity: blinkAnim }]}>TAP ▶ TO RESUME</Animated.Text>
-          </View>
+          <TouchableWithoutFeedback onPress={() => { setPaused(false); setRunning(true); }}>
+            <View style={styles.overlay}>
+              <Text style={styles.pauseTitle}>PAUSED</Text>
+              <View style={styles.menuDivider} />
+              <Text style={styles.finalScore}>SCORE: {String(score).padStart(4, '0')}</Text>
+              <Animated.Text style={[styles.tapToStart, { opacity: blinkAnim }]}>TAP TO RESUME</Animated.Text>
+            </View>
+          </TouchableWithoutFeedback>
         )}
         
         {/* Menu Screen */}
