@@ -1255,7 +1255,7 @@ export default function GameScreen({ navigation }) {
   
   // Character skins
   const [skins, setSkins] = useState(CHARACTER_SKINS.map(s => ({ ...s, isSelected: s.id === 'default' })));
-  const [currentSkin, setCurrentSkin] = useState(CHARACTER_SKINS[0]);
+  const [currentSkin, setCurrentSkinState] = useState(CHARACTER_SKINS[0]);
   
   // Mystery boxes
   const [mysteryBoxes, setMysteryBoxes] = useState(0);
@@ -1292,7 +1292,7 @@ export default function GameScreen({ navigation }) {
       setMysteryBoxes(boxCount);
       setSkins(skinData);
       const selected = CHARACTER_SKINS.find(s => s.id === currentSkinId) || CHARACTER_SKINS[0];
-      setCurrentSkin(selected);
+      setCurrentSkinState(selected);
     };
     loadData();
     initSounds();
@@ -1500,12 +1500,12 @@ export default function GameScreen({ navigation }) {
 
   // Handle skin selection
   const handleSkinSelect = async (skinId) => {
-    const success = await setCurrentSkin(skinId);
+    const success = await setCurrentSkin(skinId); // storage function
     if (success) {
       const skinData = await getSkinData();
       setSkins(skinData);
       const selected = CHARACTER_SKINS.find(s => s.id === skinId);
-      setCurrentSkin(selected);
+      setCurrentSkinState(selected); // state setter - full skin object
     }
   };
 
