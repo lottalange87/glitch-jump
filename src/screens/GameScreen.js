@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { GameEngine } from 'react-native-game-engine';
-import { StyleSheet, StatusBar, TouchableWithoutFeedback, View, Text, Dimensions } from 'react-native';
+import { StyleSheet, StatusBar, TouchableWithoutFeedback, View, Text, Dimensions, Animated } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { GAME } from '../utils/constants';
 import { getHighscore, checkHighscore } from '../utils/storage';
@@ -311,10 +311,24 @@ export default function GameScreen() {
   const [scrollOffset, setScrollOffset] = useState(0);
   const [showMenu, setShowMenu] = useState(true);
   const [gameKey, setGameKey] = useState(0);
+  const [currentSpeed, setCurrentSpeed] = useState(1);
+  const blinkAnim = useRef(new Animated.Value(1)).current;
   const engineRef = useRef(null);
 
   useEffect(() => {
     getHighscore().then(setHighscoreState);
+  }, []);
+
+  // Blinking animation for "TAP TO START"
+  useEffect(() => {
+    const blink = Animated.loop(
+      Animated.sequence([
+        Animated.timing(blinkAnim, { toValue: 0.2, duration: 600, useNativeDriver: true }),
+        Animated.timing(blinkAnim, { toValue: 1, duration: 600, useNativeDriver: true }),
+      ])
+    );
+    blink.start();
+    return () => blink.stop();
   }, []);
 
   const createEntities = () => ({
@@ -390,11 +404,13 @@ export default function GameScreen() {
     }
   };
 
-  // Update scroll offset for parallax
+  // Update scroll offset for parallax + speed display
   useEffect(() => {
     if (running && entities.gameState) {
       const interval = setInterval(() => {
         setScrollOffset(entities.gameState.scrollOffset || 0);
+        const spd = entities.gameState.speed || GAME.BASE_SPEED;
+        setCurrentSpeed(Math.round((spd / GAME.BASE_SPEED) * 10) / 10);
       }, 50);
       return () => clearInterval(interval);
     }
@@ -418,12 +434,20 @@ export default function GameScreen() {
         {/* Ground */}
         <Ground />
         
-        {/* Score */}
-        {!showMenu && (
-          <View style={styles.scoreContainer}>
-            <Text style={styles.scoreLabel}>SCORE</Text>
-            <Text style={styles.score}>{String(score).padStart(4, '0')}</Text>
-          </View>
+        {/* Score + Speed */}
+        {!showMenu && !gameOver && (
+          <>
+            <View style={styles.scoreContainer}>
+              <Text style={styles.scoreLabel}>SCORE</Text>
+              <Text style={styles.score}>{String(score).padStart(4, '0')}</Text>
+            </View>
+            <View style={styles.speedContainer}>
+              <Text style={styles.speedLabel}>SPEED</Text>
+              <Text style={[styles.speedValue, currentSpeed >= 1.8 && { color: GAME.COLORS.OBSTACLE }]}>
+                {currentSpeed}x
+              </Text>
+            </View>
+          </>
         )}
         
         {/* Menu Screen */}
@@ -433,7 +457,7 @@ export default function GameScreen() {
             <Text style={styles.titleAccent}>JUMP</Text>
             <View style={styles.menuDivider} />
             <Text style={styles.menuHighscore}>BEST: {String(highscore).padStart(4, '0')}</Text>
-            <Text style={styles.tapToStart}>TAP TO START</Text>
+            <Animated.Text style={[styles.tapToStart, { opacity: blinkAnim }]}>TAP TO START</Animated.Text>
           </View>
         )}
         
@@ -448,7 +472,8 @@ export default function GameScreen() {
             {isNewHighscore && (
               <Text style={styles.newHighscore}>★ NEW RECORD ★</Text>
             )}
-            <Text style={styles.tapToStart}>TAP TO RETRY</Text>
+            <Text style={styles.speedStat}>MAX SPEED: {currentSpeed}x</Text>
+            <Animated.Text style={[styles.tapToStart, { opacity: blinkAnim }]}>TAP TO RETRY</Animated.Text>
           </View>
         )}
         
@@ -569,6 +594,32 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     letterSpacing: 2,
     marginBottom: 8,
+  },
+  speedContainer: {
+    position: 'absolute',
+    top: 50,
+    left: 20,
+    alignItems: 'flex-start',
+    zIndex: 50,
+  },
+  speedLabel: {
+    color: GAME.COLORS.TEXT_DIM,
+    fontSize: 12,
+    fontFamily: 'monospace',
+    letterSpacing: 3,
+  },
+  speedValue: {
+    color: GAME.COLORS.ACCENT,
+    fontSize: 20,
+    fontWeight: 'bold',
+    fontFamily: 'monospace',
+  },
+  speedStat: {
+    color: GAME.COLORS.TEXT_DIM,
+    fontSize: 14,
+    fontFamily: 'monospace',
+    marginTop: 8,
+    letterSpacing: 1,
   },
   newHighscore: {
     color: GAME.COLORS.ACCENT,
