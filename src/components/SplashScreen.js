@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet, Animated, Dimensions } from 'react-native';
-import { GAME } from './constants';
+import { GAME } from '../utils/constants';
 
 const { width: SW, height: SH } = Dimensions.get('window');
 
