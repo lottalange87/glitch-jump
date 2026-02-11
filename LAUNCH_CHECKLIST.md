@@ -6,23 +6,24 @@
 
 ## 🚨 KRITISCH (Ohne das kein App Store)
 
-- [ ] **App Icons**
+- [x] **App Icons** ✅
   - 1024×1024 App Store Icon
   - 180×180 iPhone Home Screen
   - 120×120 iPhone Spotlight
   - 87×87 Settings
   - Android adaptive icons
-  - >**Lotta:** Pixel-Art Style, "GJ" oder Charakter-Silhouette
+  - >**Lotta:** Pixel-Art Style "GJ" monogram in neon/cyberpunk colors — created in `assets/icons/`
 
-- [ ] **Splash Screen (Loading Screen)**
+- [x] **Splash Screen (Loading Screen)** ✅
   - Zeigt sich beim App-Start (1-2 Sekunden)
   - Branding: "GLITCH JUMP" + Retro-Look
   - >**Lotta:** Implementiert ✓
 
-- [ ] **Privacy Policy**
+- [x] **Privacy Policy** ✅
   - Einfache HTML-Seite: "Wir sammeln keine Daten"
   - URL für App Store: z.B. glitchjump.ljc.de/privacy
-  - >**Jörg:** Domain einrichten oder ljc.de Unterseite
+  - >**Lotta:** Created at `privacy-policy.html` — ready to host
+  - >**Jörg:** Upload to glitchjump.ljc.de/privacy
 
 - [ ] **App Store Listing**
   - Titel: "Glitch Jump — Retro Arcade Runner"
@@ -101,8 +102,10 @@
 
 ## ✅ Heute Abgeschlossen
 
-- Splash Screen: ✓ (Lotta)
+- ✅ App Icons: 7 icon files in `assets/icons/` (Pixel-art GJ monogram, neon/cyberpunk style)
+- ✅ Privacy Policy: `privacy-policy.html` created (clean, simple, hosted-ready)
+- ✅ Splash Screen: ✓ (Lotta — already done)
 
 ---
 
-*Letztes Update: 2026-02-10 22:55*
+*Letztes Update: 2026-02-11 22:25*
